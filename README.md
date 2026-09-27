@@ -33,6 +33,37 @@ pnpm db:seed          # write seed data (aborts if the gate blocks a story)
 pnpm db:studio        # browse data
 ```
 
+## Local database
+
+ETHOS needs Postgres with **pgvector**. A one-off container, here on port **5433**
+because 5432 was already taken by another local project (`traffy-postgres`) —
+pick any free port:
+
+```bash
+docker run -d --name ethos-postgres \
+  -e POSTGRES_USER=ethos -e POSTGRES_PASSWORD=ethos -e POSTGRES_DB=ethos \
+  -p 5433:5432 -v ethos-pgdata:/var/lib/postgresql/data \
+  pgvector/pgvector:pg16
+```
+
+Then copy `.env.example` → `.env` (`.env` is gitignored) and point
+`DATABASE_URL` at that port:
+
+```bash
+pnpm db:migrate     # applies prisma/migrations
+pnpm db:seed        # gate-checked, idempotent write of the seed dossiers
+```
+
+`pnpm db:seed` routes through `prisma db seed` so the Prisma CLI loads `.env`
+first — plain `tsx prisma/seed/seed.ts` fails with `P1012 DATABASE_URL not found`
+because **`PrismaClient` does not read `.env` itself**, only the CLI does.
+
+`prisma/migrations/0001_init/migration.sql` opens with
+`CREATE EXTENSION IF NOT EXISTS vector;` because `Story.embedding` and
+`Claim.embedding` declare `vector(1536)` — that type must exist before those
+`CREATE TABLE` statements run. `pnpm db:migrate` ordering is safe to verify with
+`prisma migrate status`.
+
 ## Verification harness (`src/lib/verification.ts`)
 
 Pure functions — no DB, no network, no model inference — so results are
