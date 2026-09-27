@@ -38,32 +38,6 @@ const STANCE_META: Record<
   },
 };
 
-export function inferStance(reporting: string): SourceStance {
-  const text = reporting.toLowerCase();
-  if (
-    text.includes("warn") ||
-    text.includes("caution") ||
-    text.includes("unlikely") ||
-    text.includes("dispute") ||
-    text.includes("friction") ||
-    text.includes("shortfall") ||
-    text.includes("only adhere") ||
-    text.includes("sidelines")
-  ) {
-    return "DISPUTES";
-  }
-  if (
-    text.includes("focus") ||
-    text.includes("emphasi") ||
-    text.includes("highlight") ||
-    text.includes("emotional") ||
-    text.includes("mechanic")
-  ) {
-    return "ADDS_CONTEXT";
-  }
-  return "CONFIRMS";
-}
-
 export const StanceLabel: React.FC<StanceLabelProps> = ({ stance, className }) => {
   const meta = STANCE_META[stance];
   const Icon = meta.icon;

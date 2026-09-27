@@ -12,6 +12,7 @@ import { PrismaClient } from "@prisma/client";
 import storiesJson from "../../src/data/mockStories.json";
 import type { Story } from "@/types/story";
 import { validateStory } from "../../src/lib/verification";
+import { resolveStance } from "../../src/lib/stance";
 
 const stories = storiesJson as unknown as Story[];
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -255,7 +256,7 @@ async function seedRelations(
         data: {
           sourceName: pt.sourceName,
           reporting: pt.reporting,
-          stance: pt.stance ?? "CONFIRMS",
+          stance: resolveStance(pt),
           itemId: item.id,
         },
       });

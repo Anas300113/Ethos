@@ -1,7 +1,8 @@
 import React from "react";
 import { SourceComparisonItem, TimelineEvent, ArticleSource } from "@/types/story";
 import { Layers, History, ExternalLink, Clock3 } from "lucide-react";
-import { StanceLabel, inferStance } from "@/components/ui/StanceLabel";
+import { StanceLabel } from "@/components/ui/StanceLabel";
+import { resolveStance } from "@/lib/stance";
 
 interface AnalysisSectionsProps {
   whereSourcesDiffer: SourceComparisonItem[];
@@ -37,7 +38,7 @@ export const AnalysisSections: React.FC<AnalysisSectionsProps> = ({
                 </h3>
                 <div className="space-y-2">
                   {item.points.map((pt, i) => {
-                    const stance = pt.stance ?? inferStance(pt.reporting);
+                    const stance = resolveStance(pt);
                     return (
                       <div
                         key={i}

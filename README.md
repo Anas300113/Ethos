@@ -27,6 +27,8 @@ pnpm gate:check       # validate every seeded story against the publish gate
 pnpm gate:probe:inject    # temporarily break seed data to prove the gate blocks
 pnpm gate:probe:restore   # undo the probe
 
+pnpm stance:check     # assert Postgres stance labels match the JSON-derived ones
+
 pnpm db:generate      # prisma client
 pnpm db:seed:dry      # print planned writes + gate results (no DB needed)
 pnpm db:seed          # write seed data (aborts if the gate blocks a story)
@@ -54,9 +56,13 @@ pnpm db:migrate     # applies prisma/migrations
 pnpm db:seed        # gate-checked, idempotent write of the seed dossiers
 ```
 
-`pnpm db:seed` routes through `prisma db seed` so the Prisma CLI loads `.env`
-first — plain `tsx prisma/seed/seed.ts` fails with `P1012 DATABASE_URL not found`
-because **`PrismaClient` does not read `.env` itself**, only the CLI does.
+`pnpm db:seed` routes through `prisma db seed`, which reads **`prisma.config.ts`**
+(the replacement for the deprecated `package.json#prisma` block). Note the
+gotcha: once a config file exists the Prisma CLI **stops loading `.env` itself**
+(it prints "Prisma config detected, skipping environment variable loading"), so
+`prisma.config.ts` calls `process.loadEnvFile(".env")` explicitly. `PrismaClient`
+never reads `.env` on its own, and standalone tsx scripts
+(`scripts/stance-parity-check.ts`) load it the same way.
 
 `prisma/migrations/0001_init/migration.sql` opens with
 `CREATE EXTENSION IF NOT EXISTS vector;` because `Story.embedding` and
@@ -91,15 +97,44 @@ src/app/                 Today feed, For You, Search, Saved, story dossiers
 src/components/story/    StoryCard + detail sections (gate, claims, analysis)
 src/components/ui/       ClaimBadge, StanceLabel
 src/lib/verification.ts  Deterministic publish gate
+src/lib/stance.ts        Single source of truth for stance labels (JSON + DB)
 src/data/                Seed dataset (mockStories.json + typed accessors)
 prisma/                  Schema, pgvector migration, idempotent seed
-scripts/                 Gate CLI + probes
+prisma.config.ts         Prisma CLI config (loads .env; replaces package.json#prisma)
+scripts/                 Gate CLI, stance-parity check, probes
 ```
 
 ## Data flow
 
 1. `src/data/mockStories.json` is the canonical seed dossier set.
 2. `prisma/seed/seed.ts` mirrors it into Postgres (stable IDs, upserts, gate-checked).
-3. Pages read through `src/data/mockStories.ts` accessors today; swapping those
+3. Stance labels are resolved by `src/lib/stance.ts::resolveStance()` on **both**
+   the seed (write) and dossier-UI (read) paths, so a point cannot be labelled
+   "Disputes" on screen while stored as "Confirms". `pnpm stance:check` asserts the
+   stored rows still match the JSON-derived labels.
+4. Pages read through `src/data/mockStories.ts` accessors today; swapping those
    for Prisma queries is the next increment.
+
+## Operational safety
+
+The Docker host running `ethos-postgres` is **shared with other projects**
+(`traffy-postgres`, and others). Never dump container configuration:
+
+```bash
+docker inspect <container>                            # every env var, plaintext
+docker ps --inspect                                   # same
+docker inspect -f '{{json .Config.Env}}' <container>  # same
+```
+
+Those leak *other projects'* `DATABASE_URL`s and API tokens into scrollback,
+shell history and CI logs. Ask the database instead, and keep credentials inside
+the process that needs them:
+
+```bash
+docker exec ethos-postgres psql -U ethos -d ethos \
+  -c 'SELECT stance, count(*) FROM "SourceComparisonPoint" GROUP BY stance;'
+```
+
+Parse `DATABASE_URL` from `.env` at runtime (`process.loadEnvFile`) rather than
+copying a connection string into a command, a commit, or a screenshot.
 
