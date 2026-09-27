@@ -91,12 +91,15 @@ export interface TimelineEvent {
   sourceName?: string;
 }
 
+export type SourceStance = "CONFIRMS" | "ADDS_CONTEXT" | "DISPUTES" | "OMITS";
+
 export interface SourceComparisonItem {
   id: string;
   topic: string;
   points: {
     sourceName: string;
     reporting: string;
+    stance?: SourceStance;
   }[];
 }
 
