@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ETHOS — Evidence-First News Intelligence
 
-## Getting Started
+ETHOS synthesises multi-source reporting around **discrete claims** and grounds
+each claim in **primary evidence** (treaties, statutory releases, court filings,
+parliamentary records). No claim reaches a reader without passing a
+deterministic publish gate.
 
-First, run the development server:
+## Stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js (App Router, React, TypeScript) |
+| Styling | Tailwind CSS v4 + editorial design tokens in `src/app/globals.css` |
+| Icons | lucide-react |
+| Persistence | Prisma + PostgreSQL (pgvector-ready) |
+| Tests | Node's built-in `node:test` via `tsx` |
+
+## Commands
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm dev              # dev server
+pnpm build            # production build (type-checks)
+pnpm lint             # eslint
+pnpm test             # verification harness unit tests
+
+pnpm gate:check       # validate every seeded story against the publish gate
+pnpm gate:probe:inject    # temporarily break seed data to prove the gate blocks
+pnpm gate:probe:restore   # undo the probe
+
+pnpm db:generate      # prisma client
+pnpm db:seed:dry      # print planned writes + gate results (no DB needed)
+pnpm db:seed          # write seed data (aborts if the gate blocks a story)
+pnpm db:studio        # browse data
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Verification harness (`src/lib/verification.ts`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Pure functions — no DB, no network, no model inference — so results are
+reproducible and testable.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Rule | Enforced |
+| --- | --- |
+| `SUPPORTED` / `CORROBORATED` | requires ≥1 primary evidence doc **and** ≥1 corroborating quote |
+| `PARTIALLY_SUPPORTED` | requires evidence **or** corroboration |
+| `DISPUTED` / `CONTRADICTED` | requires ≥1 disputing source with a non-empty reason |
+| Fair use | quotes, snippets and excerpts capped at **250 characters** |
+| URLs | every citation must be a valid `http(s)` URL |
+| Confidence | must be within `[0, 1]` |
+| Timeline | timestamps must be non-decreasing |
+| Completeness | a story must carry at least one claim and one source |
 
-## Learn More
+`validateStory()` returns `{ publishable, issues[] }`. The seed script refuses to
+persist a blocked story unless `--force` is passed, and the story dossier UI
+surfaces the same result in the Verification Gate card.
 
-To learn more about Next.js, take a look at the following resources:
+## Layout
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/app/                 Today feed, For You, Search, Saved, story dossiers
+src/components/story/    StoryCard + detail sections (gate, claims, analysis)
+src/components/ui/       ClaimBadge, StanceLabel
+src/lib/verification.ts  Deterministic publish gate
+src/data/                Seed dataset (mockStories.json + typed accessors)
+prisma/                  Schema, pgvector migration, idempotent seed
+scripts/                 Gate CLI + probes
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Data flow
 
-## Deploy on Vercel
+1. `src/data/mockStories.json` is the canonical seed dossier set.
+2. `prisma/seed/seed.ts` mirrors it into Postgres (stable IDs, upserts, gate-checked).
+3. Pages read through `src/data/mockStories.ts` accessors today; swapping those
+   for Prisma queries is the next increment.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

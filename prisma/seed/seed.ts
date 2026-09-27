@@ -11,9 +11,11 @@
 import { PrismaClient } from "@prisma/client";
 import storiesJson from "../../src/data/mockStories.json";
 import type { Story } from "@/types/story";
+import { validateStory } from "../../src/lib/verification";
 
 const stories = storiesJson as unknown as Story[];
 const DRY_RUN = process.argv.includes("--dry-run");
+const FORCE = process.argv.includes("--force");
 
 
 function planSummary() {
@@ -304,6 +306,22 @@ async function seedRelations(
 async function main(): Promise<void> {
   const { counts, publisherCount } = planSummary();
   console.log("[ethos:seed] plan", JSON.stringify({ ...counts, publisherCount }));
+
+  // Deterministic publish gate: refuse to persist ungrounded stories.
+  const gateResults = stories.map((s) => validateStory(s));
+  const failed = gateResults.filter((r) => !r.publishable);
+  for (const r of failed) {
+    console.error(`[ethos:seed] GATE FAILED ${r.slug} (${r.issues.length} issues)`);
+    for (const issue of r.issues) {
+      console.error(`  - ${issue.code}: ${issue.message}`);
+    }
+  }
+  if (failed.length > 0 && !FORCE) {
+    console.error(
+      "[ethos:seed] aborting: ungrounded stories cannot be published. Re-run with --force to override."
+    );
+    process.exit(1);
+  }
 
   if (DRY_RUN) {
     for (const s of stories) {

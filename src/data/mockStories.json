@@ -302,7 +302,15 @@
             "quote": "US negotiators maintained observer status, clarifying they endorse technical benchmarks without signing the treaty."
           }
         ],
-        "lastVerified": "2026-09-27T08:10:00Z"
+        "lastVerified": "2026-09-27T08:10:00Z",
+        "disputingSources": [
+          {
+            "publisherName": "The Wall Street Journal",
+            "url": "https://wsj.com/tech/ai/geneva-ai-summit-us-stance",
+            "quote": "US negotiators maintained observer status, clarifying they endorse the technical benchmarks without signing the treaty.",
+            "disputeReason": "The treaty text confirms observer status, which the claim characterises as formal refusal."
+          }
+        ]
       }
     ],
     "timeline": [
@@ -359,6 +367,20 @@
         "title": "Tech hubs forge frontier AI accord as US stays on sidelines as observer",
         "publishedAt": "2026-09-26T17:15:00Z",
         "retrievedAt": "2026-09-26T17:45:00Z"
+      },
+      {
+        "id": "s-203",
+        "publisher": {
+          "id": "pub-wsj",
+          "name": "The Wall Street Journal",
+          "domain": "wsj.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "US"
+        },
+        "url": "https://wsj.com/tech/ai/geneva-ai-summit-us-stance",
+        "title": "Geneva AI accord signed without US ratification as negotiators keep observer seat",
+        "publishedAt": "2026-09-26T18:40:00Z",
+        "retrievedAt": "2026-09-26T19:00:00Z"
       }
     ]
   },
