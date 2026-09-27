@@ -1,19 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, Moon, Sun } from "lucide-react";
 
 export const EditorialHeader: React.FC = () => {
-  const [mounted, setMounted] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  // Lazy initializers run during render (client value on fresh mount,
+  // server value reused across hydration) — no effect needed, no
+  // hydration mismatch, no cascading renders.
+  const [isDark, setIsDark] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark")
+  );
 
-  useEffect(() => {
-    setMounted(true);
-    if (document.documentElement.classList.contains("dark")) {
-      setIsDark(true);
-    }
-  }, []);
+  const [currentDate] = useState(() =>
+    new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date())
+  );
 
   const toggleDarkMode = () => {
     if (isDark) {
@@ -24,12 +31,6 @@ export const EditorialHeader: React.FC = () => {
       setIsDark(true);
     }
   };
-
-  const currentDate = new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date());
 
   return (
     <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200/60 dark:border-zinc-800/60 transition-colors">
@@ -56,19 +57,17 @@ export const EditorialHeader: React.FC = () => {
             <span>Audited Intelligence</span>
           </div>
 
-          {mounted && (
-            <button
-              onClick={toggleDarkMode}
-              aria-label="Toggle dark mode"
-              className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 transition-colors"
-            >
-              {isDark ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-zinc-700" />
-              )}
-            </button>
-          )}
+          <button
+            onClick={toggleDarkMode}
+            aria-label="Toggle dark mode"
+            className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 transition-colors"
+          >
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-zinc-700" />
+            )}
+          </button>
         </div>
       </div>
       <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-medium border-t border-zinc-100 dark:border-zinc-900">
