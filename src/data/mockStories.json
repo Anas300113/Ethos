@@ -1,0 +1,478 @@
+[
+  {
+    "id": "story-1",
+    "slug": "uk-housing-package-4bn-affordable-homes",
+    "headline": "UK unveils £4bn housing package targeting 100,000 new affordable homes",
+    "oneSentenceSummary": "Ministers commit £4bn in funding to accelerate social and affordable homebuilding across England, facing scrutiny over delivery timelines.",
+    "heroImageUrl": "https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=1200&auto=format&fit=crop",
+    "heroImageCaption": "New residential developments planned under the national affordable homes scheme.",
+    "topic": "UK",
+    "readingTimeMinutes": 5,
+    "lastUpdated": "2026-09-27T10:45:00Z",
+    "version": 3,
+    "isDeveloping": false,
+    "whatHappened": "The UK Chancellor and Deputy Prime Minister have announced a £4 billion allocation to the Affordable Homes Programme. The package includes direct grant subsidies for local authorities and housing associations, alongside planning deregulation intended to release disused brownfield sites in regional cities.\n\nWhile government figures cite a target of 100,000 newly built units by 2030, industry observers note that rising raw material costs and skilled labour constraints may restrict total completions.",
+    "whyItMatters": "Housing affordability and waiting lists for social housing have reached record highs in England. This represents the single largest capital allocation for residential construction by the current administration, testing whether central funding can overcome long-standing local planning bottlenecks.",
+    "whatWeKnow": [
+      "£4 billion of capital funding is formally committed from the Treasury reserve.",
+      "Funding will be distributed via Homes England to councils and registered providers.",
+      "Target commencement begins within the upcoming financial quarter.",
+      "The policy was confirmed simultaneously in a Treasury Policy Paper and parliamentary statement."
+    ],
+    "whatIsUnclear": [
+      "The exact proportion of homes designated as social rent versus affordable homeownership.",
+      "Independent confirmation whether the 100,000 target accounts for demolitions and replacements.",
+      "How regional councils with capped borrowing powers will raise matching finance."
+    ],
+    "sourcesAgreeOn": [
+      "The £4bn headline figure is authentic and officially budgeted.",
+      "Homes England will serve as the chief distributing agency.",
+      "Planning consultation on brownfield fast-tracking will open next month."
+    ],
+    "whereSourcesDiffer": [
+      {
+        "id": "diff-1",
+        "topic": "Feasibility of 100,000 homes completion",
+        "points": [
+          {
+            "sourceName": "BBC News",
+            "reporting": "Quotes construction federations warning that labour shortages make 100,000 completions by 2030 unlikely without expanded skilled visas."
+          },
+          {
+            "sourceName": "Reuters",
+            "reporting": "Focuses on the Treasury fiscal impact and debt-to-GDP headroom, describing the allocation as fiscally neutral within departmental capital budgets."
+          },
+          {
+            "sourceName": "Financial Times",
+            "reporting": "Highlights friction between rural backbench MPs and housing ministers over proposed brownfield vs green belt classification."
+          }
+        ]
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim-101",
+        "statement": "The government has committed £4 billion of capital funding to affordable housing.",
+        "status": "SUPPORTED",
+        "confidenceScore": 0.98,
+        "explanation": "Confirmed directly by HM Treasury policy publication and corroborated across all primary secondary outlets.",
+        "primaryEvidence": [
+          {
+            "id": "ev-1",
+            "title": "HM Treasury Capital Allocation: Affordable Housing Programme Addendum",
+            "documentType": "GOVERNMENT_DOCUMENT",
+            "issuingBody": "HM Treasury",
+            "url": "https://www.gov.uk/government/publications/housing-capital-allocation",
+            "summary": "Statutory paper outlining £4.00bn Treasury reserve release to Homes England for 2026-2030.",
+            "date": "2026-09-27",
+            "excerpt": "Section 3.2: An envelope of £4,000,000,000 is earmarked for grant allocation under the revised AHP framework."
+          }
+        ],
+        "corroboratingSources": [
+          {
+            "publisherName": "Reuters",
+            "url": "https://reuters.com/world/uk/uk-housing-funding-announcement",
+            "quote": "The Treasury confirmed the £4bn funding commitment during Wednesday morning briefing."
+          },
+          {
+            "publisherName": "BBC News",
+            "url": "https://bbc.com/news/uk-politics-housing-package",
+            "quote": "Ministers formally laid the four-billion-pound measure before Parliament today."
+          }
+        ],
+        "lastVerified": "2026-09-27T10:30:00Z"
+      },
+      {
+        "id": "claim-102",
+        "statement": "The policy will create 100,000 net new homes by 2030.",
+        "status": "UNVERIFIED",
+        "confidenceScore": 0.52,
+        "explanation": "Stated as an aspiration by ministers, but independent construction analysis indicates gross rather than net additions.",
+        "primaryEvidence": [
+          {
+            "id": "ev-2",
+            "title": "Ministry of Housing Press Briefing",
+            "documentType": "OFFICIAL_STATEMENT",
+            "issuingBody": "Department for Levelling Up, Housing and Communities",
+            "summary": "Press handout stating aspirational 100k target over four years.",
+            "date": "2026-09-27",
+            "excerpt": "We estimate capacity to deliver up to 100,000 additional high-efficiency dwellings."
+          }
+        ],
+        "corroboratingSources": [
+          {
+            "publisherName": "Sky News",
+            "url": "https://news.sky.com/story/uk-housing-minister-announcement",
+            "quote": "The Secretary of State reiterated the goal of delivering 100,000 homes."
+          }
+        ],
+        "disputingSources": [
+          {
+            "publisherName": "Financial Times",
+            "url": "https://ft.com/content/uk-housing-reality-check",
+            "quote": "National Housing Federation internal memo cautions that net completions may fall short of the 100,000 headline figure.",
+            "disputeReason": "Distinguishes between gross construction and net housing stock addition."
+          }
+        ],
+        "lastVerified": "2026-09-27T10:40:00Z"
+      }
+    ],
+    "timeline": [
+      {
+        "id": "tl-1",
+        "timestamp": "2026-09-27T07:00:00Z",
+        "displayTime": "07:00 BST",
+        "eventText": "Initial reports emerge indicating £4bn capital package planned for announcement.",
+        "sourceName": "BBC Radio 4"
+      },
+      {
+        "id": "tl-2",
+        "timestamp": "2026-09-27T09:30:00Z",
+        "displayTime": "09:30 BST",
+        "eventText": "HM Treasury publishes formal policy paper confirming £4bn funding envelope.",
+        "sourceName": "HM Treasury",
+        "sourceUrl": "https://www.gov.uk/government/publications/housing-capital-allocation"
+      },
+      {
+        "id": "tl-3",
+        "timestamp": "2026-09-27T10:15:00Z",
+        "displayTime": "10:15 BST",
+        "eventText": "Housing Secretary delivers oral statement to the House of Commons outlining 100k target.",
+        "sourceName": "Hansard Record"
+      }
+    ],
+    "primaryEvidence": [
+      {
+        "id": "ev-1",
+        "title": "HM Treasury Capital Allocation: Affordable Housing Programme Addendum",
+        "documentType": "GOVERNMENT_DOCUMENT",
+        "issuingBody": "HM Treasury",
+        "url": "https://www.gov.uk/government/publications/housing-capital-allocation",
+        "summary": "Official government budgetary allocation confirming £4.00bn Treasury commitment.",
+        "date": "2026-09-27"
+      }
+    ],
+    "sources": [
+      {
+        "id": "s-1",
+        "publisher": {
+          "id": "pub-reuters",
+          "name": "Reuters",
+          "domain": "reuters.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "UK"
+        },
+        "url": "https://reuters.com/world/uk/uk-housing-funding-announcement",
+        "title": "UK announces £4 bln affordable housing fund in regional growth push",
+        "author": "Alistair Smout",
+        "publishedAt": "2026-09-27T09:45:00Z",
+        "retrievedAt": "2026-09-27T09:50:00Z"
+      },
+      {
+        "id": "s-2",
+        "publisher": {
+          "id": "pub-bbc",
+          "name": "BBC News",
+          "domain": "bbc.co.uk",
+          "tier": "SECONDARY_TIER1",
+          "country": "UK"
+        },
+        "url": "https://bbc.com/news/uk-politics-housing-package",
+        "title": "Government pledges £4bn to boost affordable homes in England",
+        "author": "Nick Eardley",
+        "publishedAt": "2026-09-27T10:05:00Z",
+        "retrievedAt": "2026-09-27T10:10:00Z"
+      },
+      {
+        "id": "s-3",
+        "publisher": {
+          "id": "pub-ft",
+          "name": "Financial Times",
+          "domain": "ft.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "UK"
+        },
+        "url": "https://ft.com/content/uk-housing-reality-check",
+        "title": "Labour housing package: £4bn pledge meets builder capacity constraints",
+        "author": "George Parker",
+        "publishedAt": "2026-09-27T10:30:00Z",
+        "retrievedAt": "2026-09-27T10:35:00Z"
+      }
+    ],
+    "updates": [
+      {
+        "id": "up-1",
+        "timestamp": "2026-09-27T10:45:00Z",
+        "whatChanged": "Incorporated NHF industry responses regarding net vs gross delivery projections."
+      }
+    ]
+  },
+  {
+    "id": "story-2",
+    "slug": "global-ai-safety-accord-frontier-model-testing",
+    "headline": "Ten nations sign binding agreement on frontier AI model pre-deployment safety audits",
+    "oneSentenceSummary": "A multilateral treaty brokered in Geneva mandates independent red-teaming and safety disclosures for frontier models exceeding 10^26 FLOP training runs.",
+    "heroImageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop",
+    "heroImageCaption": "Delegates meet at the International Telecommunication Union in Geneva.",
+    "topic": "Technology",
+    "readingTimeMinutes": 4,
+    "lastUpdated": "2026-09-27T08:15:00Z",
+    "version": 2,
+    "isDeveloping": false,
+    "whatHappened": "Representatives from ten leading AI developing nations, including the UK, EU member states, Japan, and Canada, have signed the Geneva Accord on Frontier AI Verification. The framework establishes common protocols for third-party auditing before models surpassing specified compute thresholds are commercialised.\n\nThe United States participated as an observer and has not ratified the binding enforcement annex.",
+    "whyItMatters": "Until now, AI safety evaluations have depended largely on voluntary self-regulation by commercial labs. This accord marks the first intergovernmental treaty with harmonised audit standards and cross-border safety report exchanges.",
+    "whatWeKnow": [
+      "Ten signatory states agreed to the core evaluation protocols.",
+      "Threshold set at 10^26 FLOP or systems exhibiting autonomous cyber-exploit capabilities.",
+      "Audits will be conducted by accredited state AI Safety Institutes.",
+      "The treaty establishes a Geneva secretariat for incident sharing."
+    ],
+    "whatIsUnclear": [
+      "The degree of US and Chinese compliance, as neither has signed the binding treaty text.",
+      "Enforcement mechanisms for models developed using distributed decentralised compute clusters."
+    ],
+    "sourcesAgreeOn": [
+      "The 10^26 FLOP threshold is the agreed metric for mandatory safety evaluation.",
+      "Signatories will recognise each other national safety institute certifications."
+    ],
+    "whereSourcesDiffer": [
+      {
+        "id": "diff-2",
+        "topic": "Impact of US non-signatory observer status",
+        "points": [
+          {
+            "sourceName": "Associated Press",
+            "reporting": "Argues treaty retains substantial global authority as EU and UK represent major tech consumer markets."
+          },
+          {
+            "sourceName": "Bloomberg",
+            "reporting": "Notes that without US ratification, American tech giants may only adhere to the standards when deploying within signatory borders."
+          }
+        ]
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim-201",
+        "statement": "Ten countries signed the binding treaty in Geneva.",
+        "status": "SUPPORTED",
+        "confidenceScore": 0.99,
+        "explanation": "Confirmed by UN ITU official treaty registry and verified signatory list.",
+        "primaryEvidence": [
+          {
+            "id": "ev-201",
+            "title": "UN Treaty Registry: Geneva Convention on Frontier AI Safety Annex A",
+            "documentType": "GOVERNMENT_DOCUMENT",
+            "issuingBody": "United Nations / ITU",
+            "url": "https://treaties.un.org/pages/ViewDetails.aspx?src=TREATY&mtdsg_no=XI-D-12",
+            "summary": "Official deposit of multilateral convention and signatures of accredited plenipotentiaries.",
+            "date": "2026-09-26"
+          }
+        ],
+        "corroboratingSources": [
+          {
+            "publisherName": "Associated Press",
+            "url": "https://apnews.com/article/ai-treaty-geneva-frontier-models",
+            "quote": "Delegates from ten countries appended their signatures to the treaty on Friday afternoon."
+          }
+        ],
+        "lastVerified": "2026-09-27T08:00:00Z"
+      },
+      {
+        "id": "claim-202",
+        "statement": "The United States has formally refused to participate in the auditing regime.",
+        "status": "DISPUTED",
+        "confidenceScore": 0.88,
+        "explanation": "Contradicted by State Department statements; the US holds observer status and participates in technical working groups while declining binding treaty ratification.",
+        "primaryEvidence": [
+          {
+            "id": "ev-202",
+            "title": "US Department of State Press Statement on Geneva AI Talks",
+            "documentType": "OFFICIAL_STATEMENT",
+            "issuingBody": "US Department of State",
+            "summary": "Confirms observer role and commitment to bilateral alignment without treaty ratification.",
+            "date": "2026-09-26",
+            "excerpt": "The United States remains committed to reciprocal safety testing while reserving regulatory sovereignty."
+          }
+        ],
+        "corroboratingSources": [
+          {
+            "publisherName": "Bloomberg",
+            "url": "https://bloomberg.com/news/articles/2026-09-26/multinational-ai-rules-take-shape",
+            "quote": "US negotiators maintained observer status, clarifying they endorse technical benchmarks without signing the treaty."
+          }
+        ],
+        "lastVerified": "2026-09-27T08:10:00Z"
+      }
+    ],
+    "timeline": [
+      {
+        "id": "tl-201",
+        "timestamp": "2026-09-26T14:00:00Z",
+        "displayTime": "14:00 CEST",
+        "eventText": "Final treaty text ratified by plenipotentiaries in Geneva.",
+        "sourceName": "UN News"
+      },
+      {
+        "id": "tl-202",
+        "timestamp": "2026-09-27T08:00:00Z",
+        "displayTime": "08:00 CEST",
+        "eventText": "Joint communiqué published outlining technical standards for 10^26 FLOP models.",
+        "sourceName": "ITU Geneva"
+      }
+    ],
+    "primaryEvidence": [
+      {
+        "id": "ev-201",
+        "title": "UN Treaty Registry: Geneva Convention on Frontier AI Safety Annex A",
+        "documentType": "GOVERNMENT_DOCUMENT",
+        "issuingBody": "United Nations / ITU",
+        "summary": "Multilateral treaty deposit document.",
+        "date": "2026-09-26"
+      }
+    ],
+    "sources": [
+      {
+        "id": "s-201",
+        "publisher": {
+          "id": "pub-ap",
+          "name": "Associated Press",
+          "domain": "apnews.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "US"
+        },
+        "url": "https://apnews.com/article/ai-treaty-geneva-frontier-models",
+        "title": "Ten nations sign Geneva treaty on artificial intelligence safety audits",
+        "publishedAt": "2026-09-26T16:00:00Z",
+        "retrievedAt": "2026-09-26T16:30:00Z"
+      },
+      {
+        "id": "s-202",
+        "publisher": {
+          "id": "pub-bloomberg",
+          "name": "Bloomberg",
+          "domain": "bloomberg.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "US"
+        },
+        "url": "https://bloomberg.com/news/articles/2026-09-26/multinational-ai-rules-take-shape",
+        "title": "Tech hubs forge frontier AI accord as US stays on sidelines as observer",
+        "publishedAt": "2026-09-26T17:15:00Z",
+        "retrievedAt": "2026-09-26T17:45:00Z"
+      }
+    ]
+  },
+  {
+    "id": "story-3",
+    "slug": "cop31-climate-financing-loss-damage-facility",
+    "headline": "COP31 climate summit reaches agreement on  vulnerable nations fund",
+    "oneSentenceSummary": "Negotiators finalise operational guidelines for the loss and damage facility, establishing mandatory contributions for high-emission historical economies.",
+    "heroImageUrl": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1200&auto=format&fit=crop",
+    "heroImageCaption": "Delegations deliberate during the late-night plenary session.",
+    "topic": "Climate",
+    "readingTimeMinutes": 4,
+    "lastUpdated": "2026-09-26T22:30:00Z",
+    "version": 1,
+    "isDeveloping": false,
+    "whatHappened": "Following 36 hours of extended overtime negotiations, delegates at the COP31 climate conference agreed to capitalise the international Loss and Damage Fund at  billion annually by 2028. The breakthrough followed an eleventh-hour compromise regarding sovereign contribution quotas.",
+    "whyItMatters": "Island nations and developing economies facing escalating coastal erosion and extreme weather events have sought guaranteed capitalisation for over a decade. The agreement creates binding financial schedules backed by World Bank oversight.",
+    "whatWeKnow": [
+      "The  billion annual target is formally codified in the summit final declaration.",
+      "The World Bank will host the fund on an interim four-year tenure with independent governance.",
+      "First tranche disbursals are scheduled for Q2 2027."
+    ],
+    "whatIsUnclear": [
+      "The exact legal mechanism to compel compliance if a signatory legislature declines annual appropriations.",
+      "Whether middle-income high emitters will be required to contribute after 2030."
+    ],
+    "sourcesAgreeOn": [
+      "The  figure was the indispensable demand of the G77 and Small Island States bloc.",
+      "The World Bank compromise overcame the primary impasse between the EU and developing countries."
+    ],
+    "whereSourcesDiffer": [
+      {
+        "id": "diff-3",
+        "topic": "Enforceability of national contributions",
+        "points": [
+          {
+            "sourceName": "Reuters",
+            "reporting": "Focuses on the financial mechanics and World Bank governance compromise."
+          },
+          {
+            "sourceName": "BBC News",
+            "reporting": "Highlights the emotional appeals from vulnerable Pacific island delegates."
+          }
+        ]
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim-301",
+        "statement": "The treaty establishes a  billion annual target for the Loss and Damage Fund.",
+        "status": "SUPPORTED",
+        "confidenceScore": 0.97,
+        "explanation": "Directly referenced in UNFCCC Decision 1/CP.31 document.",
+        "primaryEvidence": [
+          {
+            "id": "ev-301",
+            "title": "UNFCCC COP31 Final Plenary Decision 1/CP.31",
+            "documentType": "GOVERNMENT_DOCUMENT",
+            "issuingBody": "UN Framework Convention on Climate Change",
+            "summary": "Final agreed text of COP31 climate negotiations.",
+            "date": "2026-09-26"
+          }
+        ],
+        "corroboratingSources": [
+          {
+            "publisherName": "Reuters",
+            "url": "https://reuters.com/business/environment/cop31-climate-deal",
+            "quote": "Negotiators clinched the  annual facility in the final gavel session."
+          }
+        ],
+        "lastVerified": "2026-09-26T22:00:00Z"
+      }
+    ],
+    "timeline": [
+      {
+        "id": "tl-301",
+        "timestamp": "2026-09-26T20:30:00Z",
+        "displayTime": "20:30 Local",
+        "eventText": "Compromise draft circulated by summit presidency.",
+        "sourceName": "UNFCCC Secretariat"
+      },
+      {
+        "id": "tl-302",
+        "timestamp": "2026-09-26T22:15:00Z",
+        "displayTime": "22:15 Local",
+        "eventText": "Presidency gavels final adoption without formal objections.",
+        "sourceName": "Plenary Live Feed"
+      }
+    ],
+    "primaryEvidence": [
+      {
+        "id": "ev-301",
+        "title": "UNFCCC COP31 Final Plenary Decision 1/CP.31",
+        "documentType": "GOVERNMENT_DOCUMENT",
+        "issuingBody": "UN Framework Convention on Climate Change",
+        "summary": "Plenary decision document.",
+        "date": "2026-09-26"
+      }
+    ],
+    "sources": [
+      {
+        "id": "s-301",
+        "publisher": {
+          "id": "pub-reuters",
+          "name": "Reuters",
+          "domain": "reuters.com",
+          "tier": "SECONDARY_TIER1",
+          "country": "Global"
+        },
+        "url": "https://reuters.com/business/environment/cop31-climate-deal",
+        "title": "COP31 clinches historic  billion loss and damage pact",
+        "publishedAt": "2026-09-26T22:20:00Z",
+        "retrievedAt": "2026-09-26T22:25:00Z"
+      }
+    ]
+  }
+]
