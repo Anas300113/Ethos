@@ -13,6 +13,8 @@
     "stance:check": "tsx scripts/stance-parity-check.ts",
     "gate:probe:inject": "tsx scripts/gate-probe-inject.ts",
     "gate:probe:restore": "tsx scripts/gate-probe-restore.ts",
+    "ingest": "tsx scripts/ingest.ts",
+    "ingest:dry": "tsx scripts/ingest.ts --dry-run",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

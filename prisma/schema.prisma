@@ -68,7 +68,11 @@ model Publisher {
   tier    SourceTier
   country String?
 
-  articles ArticleSource[]
+  articles    ArticleSource[]
+  /// Back-relation for the ingestion registry only. It declares nothing about
+  /// editorial standing: a publisher's `tier` is curated data that ingestion
+  /// reads but never writes (new publishers are always SECONDARY_TIER2).
+  ingestFeeds IngestFeed[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -250,4 +254,115 @@ model StoryUpdate {
   createdAt DateTime @default(now())
 
   @@index([storyId])
+}
+
+// ---------------------------------------------------------------------------
+// News ingestion pipeline (staging layer).
+//
+// Deliberately SEPARATE from the curated Story/Claim graph above. Ingested
+// items are unvalidated candidates: writing them must never satisfy the
+// publish gate, so nothing here cascades into Story/Claim/PrimaryEvidence,
+// and no ingest code may touch those models (guarded by a test).
+// Promotion from IngestedItem -> curated source stays an explicit editorial
+// step. Only metadata + a fair-use excerpt are stored, never the full body.
+// ---------------------------------------------------------------------------
+
+enum FeedFormat {
+  RSS_2_0
+  ATOM_1_0
+  RSS_1_0
+}
+
+/// Outcome of polling one feed. Named FeedRunStatus (not RunStatus) because
+/// there is deliberately no run ledger — this labels a single feed outcome and
+/// is stored on IngestFeed.lastStatus.
+enum FeedRunStatus {
+  OK
+  NOT_MODIFIED
+  REJECTED
+  FAILED
+}
+
+/// Row state, not a run transition: a candidate is either usable or was refused
+/// by normalisation. Per-run transitions (new / known / updated) are counted
+/// on FeedRunOutcome and printed per feed; only the outcome label persists,
+/// as IngestFeed.lastStatus.
+enum IngestedStatus {
+  STORED
+  REJECTED
+}
+
+enum IngestedRejection {
+  BAD_URL
+  EMPTY_TITLE
+  OFF_DOMAIN
+  OFF_TOPIC
+  STALE
+  MISSING_DATE
+  DUPLICATE_IN_FEED
+}
+
+enum DateProvenance {
+  PUBLISHED
+  MODIFIED
+  FETCHED
+}
+
+model IngestFeed {
+  id           String         @id @default(cuid())
+  /// Feed URL — unique so a run is idempotent regardless of publisher renames.
+  feedUrl      String         @unique
+  publisherId  String
+  publisher    Publisher      @relation(fields: [publisherId], references: [id])
+  format       FeedFormat     @default(RSS_2_0)
+  /// Editorial filter: an item is stored only if it matches this topic.
+  topic        StoryTopic
+  enabled      Boolean        @default(true)
+  /// Conditional-GET validators from the last response (HTTP 304 support).
+  etag         String?
+  lastModified String?
+  lastRunAt    DateTime?
+  lastStatus   FeedRunStatus?
+  lastError    String?
+
+  items IngestedItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([publisherId])
+}
+
+model IngestedItem {
+  id              String             @id @default(cuid())
+  /// Normalised, tracking-parameter-free canonical URL — the dedupe key.
+  url             String             @unique
+  title           String
+  author          String?
+  excerpt         String?            @db.Text
+  guid            String?
+  feedId          String
+  feed            IngestFeed         @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  topic           StoryTopic
+  /// STORED = usable candidate; REJECTED = seen but refused, with the reason kept.
+  status          IngestedStatus     @default(STORED)
+  rejectionCode   IngestedRejection?
+  rejectionReason String?
+  /// How many runs this URL has appeared in (re-appearance is a cheap touch).
+  seenCount       Int                @default(1)
+  publishedAt     DateTime
+  publishedSource DateProvenance     @default(PUBLISHED)
+  /// Raw date string exactly as the feed supplied it, for provenance/auditing.
+  publishedRaw    String?
+  fetchedAt       DateTime
+  /// sha256("title | excerpt") — detects retitled/re-summarised items.
+  contentHash     String
+  firstSeenAt     DateTime           @default(now())
+  lastSeenAt      DateTime           @default(now())
+
+  @@index([feedId])
+  @@index([publishedAt])
+  @@index([topic])
+  @@index([status, publishedAt])
 }
