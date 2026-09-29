@@ -1,112 +1,119 @@
-"use client";
-
-import React, { useState } from "react";
-import { getAllStories } from "@/data/mockStories";
+import React from "react";
+import Link from "next/link";
+import { Search as SearchIcon, Inbox } from "lucide-react";
 import { StoryCard } from "@/components/story/StoryCard";
-import { Search as SearchIcon, Filter, Layers } from "lucide-react";
-import { StoryTopic } from "@/types/story";
+import { searchStories } from "@/lib/stories/dal";
+import type { StoryTopic } from "@/types/story";
 
-const TOPICS: ("All" | StoryTopic)[] = [
-  "All",
+// Search answers from live published state.
+export const dynamic = "force-dynamic";
+
+const TOPICS: StoryTopic[] = [
   "UK",
-  "Technology",
-  "Climate",
   "World",
+  "Technology",
   "Science",
   "Business",
+  "Climate",
+  "Sport",
+  "Culture",
+  "Health",
+  "Education",
 ];
 
-export default function SearchPage() {
-  const allStories = getAllStories();
-  const [query, setQuery] = useState("");
-  const [selectedTopic, setSelectedTopic] = useState<string>("All");
+interface SearchPageProps {
+  searchParams: Promise<{ q?: string; topic?: string }>;
+}
 
-  const filtered = allStories.filter((story) => {
-    const matchesTopic =
-      selectedTopic === "All" ||
-      story.topic.toLowerCase() === selectedTopic.toLowerCase();
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-    const matchesQuery =
-      !query.trim() ||
-      story.headline.toLowerCase().includes(query.toLowerCase()) ||
-      story.oneSentenceSummary.toLowerCase().includes(query.toLowerCase()) ||
-      story.whatHappened.toLowerCase().includes(query.toLowerCase()) ||
-      story.claims.some((c) =>
-        c.statement.toLowerCase().includes(query.toLowerCase())
-      );
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const params = await searchParams;
+  const query = first(params.q) ?? "";
+  const rawTopic = first(params.topic);
+  const topic = TOPICS.find(
+    (candidate) => candidate.toLowerCase() === (rawTopic ?? "").toLowerCase()
+  );
 
-    return matchesTopic && matchesQuery;
-  });
+  const results = await searchStories(query, { topic, limit: 30 });
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-5">
-      <div className="space-y-1">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-editorial">
-          Search Intelligence
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <header className="space-y-3">
+        <h1 className="font-editorial text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">
+          Search
         </h1>
-        <p className="text-xs text-zinc-500">
-          Query indexed claims, primary documents, and corroborating reporting.
-        </p>
-      </div>
+        <form action="/search" method="get" className="relative">
+          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+          <input
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Search stories, claims and sources"
+            aria-label="Search stories"
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+          />
+          {topic && <input type="hidden" name="topic" value={topic} />}
+        </form>
 
-      {/* Search Input */}
-      <div className="relative">
-        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by topic, statutory body, or claim..."
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
-        />
-      </div>
+        <nav aria-label="Topics" className="flex flex-wrap gap-2">
+          <Link
+            href={query ? `/search?q=${encodeURIComponent(query)}` : "/search"}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              !topic
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            }`}
+          >
+            All
+          </Link>
+          {TOPICS.map((item) => {
+            const active = item === topic;
+            const href = `/search?${query ? `q=${encodeURIComponent(query)}&` : ""}topic=${item}`;
+            return (
+              <Link
+                key={item}
+                href={href}
+                aria-pressed={active}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {item}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
 
-      {/* Topic Filter Chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        <Filter className="w-3.5 h-3.5 text-zinc-400 shrink-0 mr-1" />
-        {TOPICS.map((topic) => {
-          const isSelected = selectedTopic === topic;
-          return (
-            <button
-              key={topic}
-              onClick={() => setSelectedTopic(topic)}
-              className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                isSelected
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {topic}
-            </button>
-          );
-        })}
-      </div>
+      <p className="text-xs text-zinc-500">
+        {results.length} {results.length === 1 ? "story" : "stories"}
+        {topic ? ` in ${topic}` : ""}
+        {query ? ` matching “${query}”` : ""}
+      </p>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-1">
-        <span>{filtered.length} Dossiers Found</span>
-        <span>Filter: {selectedTopic}</span>
-      </div>
-
-      {/* Stories List */}
-      <div className="space-y-4">
-        {filtered.map((story) => (
-          <StoryCard key={story.id} story={story} />
-        ))}
-
-        {filtered.length === 0 && (
-          <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-6 space-y-2">
-            <Layers className="w-8 h-8 text-zinc-400 mx-auto" />
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              No matching intelligence dossiers
-            </h3>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              Try adjusting your search query or reset the topic filter to
-              discover more stories.
-            </p>
-          </div>
-        )}
-      </div>
+      {results.length > 0 ? (
+        <div className="space-y-6">
+          {results.map((story) => (
+            <StoryCard key={story.id} story={story} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-14 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-6 space-y-2">
+          <Inbox className="w-7 h-7 text-zinc-400 mx-auto" />
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Nothing published yet
+          </h2>
+          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+            ETHOS only returns stories that cleared the evidence gate. Try a
+            different topic, or run the curation pipeline to publish more.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

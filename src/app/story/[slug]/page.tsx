@@ -1,63 +1,83 @@
 import { notFound } from "next/navigation";
-import { getStoryBySlug, getAllStories } from "@/data/mockStories";
-import { VerificationGateCard } from "@/components/story/detail/VerificationGateCard";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { NarrativeSection } from "@/components/story/detail/NarrativeSection";
 import { ClaimSection } from "@/components/story/detail/ClaimSection";
 import { AnalysisSections } from "@/components/story/detail/AnalysisSections";
-import { ArrowLeft, Share2 } from "lucide-react";
-import Link from "next/link";
+import { StoryCard } from "@/components/story/StoryCard";
+import { SaveButton } from "@/components/story/SaveButton";
+import { TopicFollowButton } from "@/components/story/TopicFollowButton";
+import { RecordRead } from "@/components/system/RecordRead";
+import { getStoryBySlug, getRelatedStories } from "@/lib/stories/dal";
+import {
+  getFollowedTopics,
+  getReaderId,
+  getSavedStoryRefs,
+} from "@/lib/reader";
+
+// A published story is live database state with a developing flag; a
+// prerendered snapshot would go stale inside the hour.
+export const dynamic = "force-dynamic";
 
 interface StoryPageProps {
-  params: Promise<{
-    slug: string;
-  }>;
+  params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams() {
-  const stories = getAllStories();
-  return stories.map((s) => ({ slug: s.slug }));
+function publishedOn(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
 }
 
 export default async function StoryDetailPage({ params }: StoryPageProps) {
   const { slug } = await params;
-  const story = getStoryBySlug(slug);
+  const story = await getStoryBySlug(slug);
+  if (!story) notFound();
 
-  if (!story) {
-    notFound();
-  }
+  const readerId = await getReaderId();
+  const [related, savedRefs, followedTopics] = await Promise.all([
+    getRelatedStories(story),
+    readerId ? getSavedStoryRefs(readerId) : Promise.resolve([]),
+    getFollowedTopics(readerId),
+  ]);
+  const saved = savedRefs.find((ref) => ref.slug === story.slug);
+  const publisherNames = [
+    ...new Set(story.sources.map((source) => source.publisher.name)),
+  ];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-6">
-      {/* Top Bar Navigation */}
-      <div className="flex items-center justify-between py-2 border-b border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+      <RecordRead slug={story.slug} />
+
+      <div className="flex items-center justify-between text-xs">
         <Link
           href="/"
           className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Feed</span>
+          <span>Back</span>
         </Link>
-        <div className="flex items-center gap-3 text-zinc-400 font-mono text-[11px]">
-          <span>VER.{story.version}.0</span>
-          <span>•</span>
-          <button
-            aria-label="Share story"
-            className="hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <SaveButton
+          slug={story.slug}
+          saved={Boolean(saved)}
+          updatedSinceSaved={saved?.updatedSinceSaved}
+        />
       </div>
 
-      {/* Headline & Metadata */}
-      <header className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950">
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950">
             {story.topic}
           </span>
-          <span className="text-xs text-zinc-500 font-mono">
-            {story.readingTimeMinutes} min synthesis
-          </span>
+          <TopicFollowButton
+            topic={story.topic}
+            followed={followedTopics.includes(story.topic)}
+          />
+          {story.isDeveloping && (
+            <span className="text-zinc-500">Developing story</span>
+          )}
         </div>
 
         <h1 className="font-editorial text-2xl sm:text-3xl font-bold text-zinc-950 dark:text-zinc-50 leading-tight">
@@ -68,12 +88,18 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
           {story.oneSentenceSummary}
         </p>
 
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {publisherNames.join(", ")} · {story.sources.length} sources ·{" "}
+          {story.readingTimeMinutes} min read · updated{" "}
+          {publishedOn(story.lastUpdated)}
+        </p>
+
         {story.heroImageUrl && (
-          <figure className="my-4 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+          <figure className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={story.heroImageUrl}
-              alt={story.headline}
+              alt={story.heroImageCaption || story.headline}
               className="w-full h-56 object-cover"
             />
             {story.heroImageCaption && (
@@ -85,21 +111,26 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
         )}
       </header>
 
-      {/* Verification Gate Card */}
-      <VerificationGateCard story={story} />
-
-      {/* Narrative Synthesis */}
       <NarrativeSection story={story} />
 
-      {/* Discrete Claim Audits */}
       <ClaimSection claims={story.claims} />
 
-      {/* Multi-source comparison, Timeline, and Sources */}
       <AnalysisSections
         whereSourcesDiffer={story.whereSourcesDiffer}
         timeline={story.timeline}
         sources={story.sources}
       />
+
+      {related.length > 0 && (
+        <section className="space-y-4 pt-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-zinc-200/80 dark:border-zinc-800 pb-2">
+            More in {story.topic}
+          </h2>
+          {related.map((item) => (
+            <StoryCard key={item.id} story={item} />
+          ))}
+        </section>
+      )}
     </div>
   );
 }

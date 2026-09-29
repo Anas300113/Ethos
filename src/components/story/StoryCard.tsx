@@ -1,94 +1,104 @@
 import React from "react";
 import Link from "next/link";
 import { Story } from "@/types/story";
-import { ClaimBadge } from "@/components/ui/ClaimBadge";
-import { Clock, BookOpen, Layers } from "lucide-react";
 
 interface StoryCardProps {
   story: Story;
+  /** Hero variant leads the home page: larger type, no image chrome. */
+  variant?: "standard" | "hero";
 }
 
-export const StoryCard: React.FC<StoryCardProps> = ({ story }) => {
-  const verifiedCount = story.claims.filter(
-    (c) => c.status === "SUPPORTED" || c.status === "CORROBORATED"
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - Date.parse(iso);
+  const minutes = Math.max(1, Math.round(diffMs / 60000));
+  if (minutes < 60) return `Updated ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Updated ${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return `Updated ${days} d ago`;
+}
+
+/** Plain-language evidence indicator — no percentages, no developer labels. */
+function evidenceSummary(story: Story): string | null {
+  const established = story.claims.filter(
+    (claim) => claim.status === "SUPPORTED" || claim.status === "CORROBORATED"
   ).length;
+  const unverified = story.claims.filter(
+    (claim) => claim.status === "UNVERIFIED"
+  ).length;
+  const disputed = story.claims.filter(
+    (claim) => claim.status === "DISPUTED" || claim.status === "CONTRADICTED"
+  ).length;
+  if (disputed > 0) return "Sources disagree";
+  if (established > 0 && unverified === 0) return "Backed by primary evidence";
+  if (established > 0) return `${established} of ${story.claims.length} claims evidence-backed`;
+  return "Reported, not yet confirmed";
+}
+
+export const StoryCard: React.FC<StoryCardProps> = ({ story, variant = "standard" }) => {
+  const isHero = variant === "hero";
+  const evidence = evidenceSummary(story);
 
   return (
-    <article className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+    <article className="group">
       {story.heroImageUrl && (
         <Link
           href={`/story/${story.slug}`}
-          className="relative h-48 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 block"
+          className="block relative mb-3 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={story.heroImageUrl}
-            alt={story.headline}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+            alt=""
+            className={`w-full object-cover ${isHero ? "h-64 sm:h-80" : "h-44"}`}
           />
-          <div className="absolute top-3 left-3 flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-zinc-900/90 text-white backdrop-blur-sm">
-              {story.topic}
-            </span>
-          </div>
         </Link>
       )}
 
-      <div className="p-5 flex flex-col flex-1">
-        <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 mb-2.5">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{story.readingTimeMinutes} min read</span>
-          </span>
-          <span>•</span>
-          <span className="flex items-center gap-1 font-mono text-[11px]">
-            <Layers className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{story.sources.length} sources analyzed</span>
-          </span>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span>{story.topic}</span>
+          {story.isDeveloping && (
+            <>
+              <span aria-hidden>·</span>
+              <span>Developing</span>
+            </>
+          )}
         </div>
 
-        <Link href={`/story/${story.slug}`} className="block">
-          <h2 className="font-editorial text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-50 leading-snug tracking-tight hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors mb-2">
+        <h3
+          className={`font-editorial font-bold tracking-tight text-zinc-950 dark:text-zinc-50 leading-tight ${
+            isHero ? "text-2xl sm:text-3xl" : "text-xl"
+          }`}
+        >
+          <Link
+            href={`/story/${story.slug}`}
+            className="hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+          >
             {story.headline}
-          </h2>
-        </Link>
+          </Link>
+        </h3>
 
-        <p className="text-zinc-600 dark:text-zinc-300 text-sm leading-relaxed mb-4 line-clamp-3">
+        <p
+          className={`text-zinc-600 dark:text-zinc-300 leading-relaxed ${
+            isHero ? "text-base" : "text-sm"
+          }`}
+        >
           {story.oneSentenceSummary}
         </p>
 
-        {/* Claim Grounding Bar */}
-        <div className="mt-auto pt-4 border-t border-zinc-100 dark:border-zinc-800/80">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
-              Grounding Status ({verifiedCount}/{story.claims.length} verified)
-            </span>
-            <Link
-              href={`/story/${story.slug}`}
-              className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1 hover:underline"
-            >
-              <span>View Dossier</span>
-              <BookOpen className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {story.claims.slice(0, 2).map((claim) => (
-              <ClaimBadge
-                key={claim.id}
-                status={claim.status}
-                confidenceScore={claim.confidenceScore}
-                className="text-[11px] py-0.5"
-              />
-            ))}
-            {story.claims.length > 2 && (
-              <span className="text-xs font-mono text-zinc-400 dark:text-zinc-500 self-center pl-1">
-                +{story.claims.length - 2} more
-              </span>
-            )}
-          </div>
-        </div>
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+          {story.sources.length} sources · {relativeTime(story.lastUpdated)} ·{" "}
+          {story.readingTimeMinutes} min
+          {evidence && (
+            <>
+              {" "}
+              · <span className="text-zinc-600 dark:text-zinc-300">{evidence}</span>
+            </>
+          )}
+        </p>
       </div>
     </article>
   );
 };
+

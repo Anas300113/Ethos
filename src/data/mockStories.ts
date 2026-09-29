@@ -1,3 +1,14 @@
+/**
+ * Gate-harness FIXTURES — not application data.
+ *
+ * Nothing in `src/app` reads this any more: every reader route goes through
+ * the DAL in src/lib/stories/dal.ts. These stories remain because the
+ * deterministic publish gate is tested against a fixed corpus
+ * (src/lib/verification.test.ts, scripts/gate-check.ts,
+ * scripts/stance-parity-check.ts) and because scripts/gate-probe-*.ts
+ * deliberately inject faults into mockStories.json to prove the gate fails
+ * closed. Do not import this from UI code.
+ */
 import { Story } from "@/types/story";
 import storiesJson from "./mockStories.json";
 
