@@ -7,11 +7,19 @@
  * `?? "CONFIRMS"` that previously desynced the two paths), or if the database
  * holds stale labels after a data change.
  *
+ * TWO SCOPES, because Postgres now has two writers:
+ *   1. SEED-AUTHORED stories (slugs present in mockStories.json) — strict
+ *      row-for-row parity with the JSON.
+ *   2. PIPELINE-PUBLISHED stories (everything the curation pipeline minted) —
+ *      no JSON counterpart exists by design, so parity is not meaningful;
+ *      what IS meaningful is that every stored label is a real SourceStance
+ *      resolved by the write path, never a read-path default.
+ *
  * Usage: pnpm stance:check   (requires DATABASE_URL / a seeded database)
  */
 import { existsSync } from "node:fs";
 import process from "node:process";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, SourceStance } from "@prisma/client";
 import { getAllStories } from "../src/data/mockStories";
 import { resolveStance } from "../src/lib/stance";
 
@@ -22,6 +30,15 @@ if (existsSync(".env")) {
 }
 
 type StanceRow = { itemId: string; sourceName: string; stance: string };
+
+/** A stored point plus the story it hangs off, so we can attribute the writer. */
+type StanceRowWithStory = StanceRow & { item: { story: { slug: string } } };
+
+/** The labels a write path may legally store, straight from the DB enum. */
+const VALID_STANCES = new Set<string>(Object.values(SourceStance));
+
+/** Story slugs owned by the JSON dataset — the strict-parity universe. */
+const seedSlugs = new Set(getAllStories().map((story) => story.slug));
 
 const expectedRows: StanceRow[] = getAllStories().flatMap((story) =>
   story.whereSourcesDiffer.flatMap((item) =>
@@ -51,16 +68,33 @@ function distribution(rows: StanceRow[]): string {
 async function main(): Promise<void> {
   const prisma = new PrismaClient();
   try {
-    const dbRows = (await prisma.sourceComparisonPoint.findMany({
-      select: { itemId: true, sourceName: true, stance: true },
+    // storySlug lets us split seed-authored rows (strict parity) from
+    // pipeline-published ones (label-validity only).
+    const rows = (await prisma.sourceComparisonPoint.findMany({
+      select: {
+        itemId: true,
+        sourceName: true,
+        stance: true,
+        item: { select: { story: { select: { slug: true } } } },
+      },
       orderBy: { sourceName: "asc" },
-    })) as StanceRow[];
+    })) as unknown as StanceRowWithStory[];
+
+    const seedRows = rows.filter((row) => seedSlugs.has(row.item.story.slug));
+    const pipelineRows = rows.filter((row) => !seedSlugs.has(row.item.story.slug));
 
     const expected = new Map(expectedRows.map((row) => [keyOf(row), row.stance]));
-    const actual = new Map(dbRows.map((row) => [keyOf(row), row.stance]));
+    const actual = new Map(seedRows.map((row) => [keyOf(row), row.stance]));
 
     console.log(`JSON  points: ${expectedRows.length}  [${distribution(expectedRows)}]`);
-    console.log(`DB    points: ${dbRows.length}  [${distribution(dbRows)}]`);
+    console.log(
+      `DB    points: ${seedRows.length} seed-authored  [${distribution(seedRows)}]`
+    );
+    if (pipelineRows.length > 0) {
+      console.log(
+        `DB    points: ${pipelineRows.length} pipeline-published (checked for valid labels only)`
+      );
+    }
 
     let problems = 0;
 
@@ -81,7 +115,17 @@ async function main(): Promise<void> {
     for (const key of actual.keys()) {
       if (!expected.has(key)) {
         problems += 1;
-        console.log(`EXTRA    ${key} (row in Postgres with no JSON counterpart)`);
+        console.log(`EXTRA    ${key} (seed row in Postgres with no JSON counterpart)`);
+      }
+    }
+
+    // Every stored label — seed or pipeline — must be a real SourceStance.
+    // This is what catches a write path that stores a blank/`??`-defaulted
+    // label and lets the READ path invent the difference.
+    for (const row of rows) {
+      if (!VALID_STANCES.has(row.stance)) {
+        problems += 1;
+        console.log(`BAD LABEL ${keyOf(row)} (Postgres stores "${row.stance}")`);
       }
     }
 
@@ -90,7 +134,10 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    console.log("\nStance parity OK: Postgres matches the JSON-derived labels.");
+    console.log(
+      "\nStance parity OK: seed rows match the JSON-derived labels, and all " +
+        `${rows.length} labels resolve to a real SourceStance.`
+    );
   } finally {
     await prisma.$disconnect();
   }
