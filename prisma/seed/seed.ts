@@ -89,6 +89,10 @@ async function seedStoryLevel(
       lastUpdated: new Date(s.lastUpdated),
       version: s.version,
       isDeveloping: s.isDeveloping ?? false,
+      // Seed dossiers are gate-checked curated stories: always reader-visible.
+      // (Also repairs rows that inherited CANDIDATE from the lifecycle
+      // migration's column default.)
+      status: "PUBLISHED",
       whatHappened: s.whatHappened,
       whyItMatters: s.whyItMatters,
       whatWeKnow: s.whatWeKnow,

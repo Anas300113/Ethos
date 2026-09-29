@@ -15,6 +15,8 @@
     "gate:probe:restore": "tsx scripts/gate-probe-restore.ts",
     "ingest": "tsx scripts/ingest.ts",
     "ingest:dry": "tsx scripts/ingest.ts --dry-run",
+    "curate": "tsx scripts/curate.ts",
+    "curate:dry": "tsx scripts/curate.ts --dry-run",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

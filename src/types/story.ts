@@ -67,6 +67,10 @@ export interface Claim {
   status: ClaimStatus;
   confidenceScore: number;
   explanation: string;
+  /** What KIND of assertion this is (EVENT, NUMBER, PREDICTION, ...). */
+  claimType?: string;
+  /** Who asserted it when the reporting names one ("the minister said X"). */
+  claimant?: string | null;
   primaryEvidence: PrimaryEvidence[];
   corroboratingSources: {
     publisherName: string;

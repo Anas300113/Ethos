@@ -61,6 +61,24 @@ enum SourceStance {
   OMITS
 }
 
+/// Curated-story lifecycle. INGESTED material lives in IngestedItem and never
+/// carries this status; only rows the curation pipeline promotes get one.
+/// PUBLISHED / UPDATED / REVALIDATED are reader-visible; everything else is
+/// pipeline-internal or terminal. Terminal states keep their rows for audit.
+enum StoryStatus {
+  CANDIDATE
+  CLUSTERED
+  ANALYSING
+  EVIDENCE_REVIEW
+  DRAFT
+  VALIDATING
+  PUBLISHED
+  UPDATED
+  REVALIDATED
+  REJECTED
+  ARCHIVED
+}
+
 model Publisher {
   id      String     @id @default(cuid())
   name    String
@@ -78,9 +96,65 @@ model Publisher {
   updatedAt DateTime @updatedAt
 }
 
+/// Device-scoped reader identity for MVP. No password, no e-mail: the app
+/// sets an HttpOnly `ethos_reader` cookie holding one of these stable ids,
+/// and bookmarks / preferences / reading history hang off it. Deleting the
+/// cookie starts a fresh anonymous profile; nothing personally identifying
+/// is ever stored.
+model ReaderProfile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  bookmarks      StoryBookmark[]
+  preferences    ReaderPreference[]
+  readingHistory ReadingEvent[]
+}
+
+/// One saved story for one reader. The saved copy records the story version
+/// at save time, so the UI can say "Updated since you saved this" when the
+/// curated story moves on without rewriting history.
+model StoryBookmark {
+  readerId     String
+  reader       ReaderProfile @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  storyId      String
+  story        Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  savedVersion Int
+  createdAt    DateTime      @default(now())
+
+  @@id([readerId, storyId])
+  @@index([readerId, createdAt])
+}
+
+/// Topic follow toggles for the For You feed. Ranking-only input: preferences
+/// reorder stories, they never alter factual content or hide contradictory
+/// evidence.
+model ReaderPreference {
+  readerId  String
+  reader    ReaderProfile @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  topic     StoryTopic
+  followed  Boolean       @default(true)
+  updatedAt DateTime      @updatedAt
+
+  @@id([readerId, topic])
+}
+
+/// Lightweight read receipts. Used for "recently read" and for marking a
+/// bookmark stale ("updated since you read this"). No article-level tracking.
+model ReadingEvent {
+  id       String        @id @default(cuid())
+  readerId String
+  reader   ReaderProfile @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  storyId  String
+  story    Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  readAt   DateTime      @default(now())
+
+  @@index([readerId, readAt])
+  @@index([storyId, readAt])
+}
+
 model Story {
-  id                 String     @id @default(cuid())
-  slug               String     @unique
+  id                 String      @id @default(cuid())
+  slug               String      @unique
   headline           String
   oneSentenceSummary String
   heroImageUrl       String?
@@ -88,10 +162,18 @@ model Story {
   topic              StoryTopic
   readingTimeMinutes Int
   lastUpdated        DateTime
-  version            Int        @default(1)
-  isDeveloping       Boolean    @default(false)
-  whatHappened       String     @db.Text
-  whyItMatters       String     @db.Text
+  version            Int         @default(1)
+  isDeveloping       Boolean     @default(false)
+  /// Explicit lifecycle; only the *_PUBLISHED family (below) is reader-visible.
+  status             StoryStatus @default(CANDIDATE)
+  /// Which pipeline run/version of the curation code produced this row, so a
+  /// future model or code change leaves history auditable, not overwritten.
+  pipelineVersion    String      @default("mvp-1")
+  aiProvider         String?
+  aiModel            String?
+  generatedAt        DateTime?
+  whatHappened       String      @db.Text
+  whyItMatters       String      @db.Text
   whatWeKnow         String[]
   whatIsUnclear      String[]
   sourcesAgreeOn     String[]
@@ -104,6 +186,8 @@ model Story {
   sources         ArticleSource[]
   stanceItems     SourceComparisonItem[]
   updates         StoryUpdate[]
+  bookmarks       StoryBookmark[]
+  readingEvents   ReadingEvent[]
   relatedStories  Story[]                @relation("RelatedStories")
   relatedTo       Story[]                @relation("RelatedStories")
 
@@ -114,14 +198,25 @@ model Story {
 }
 
 model Claim {
-  id              String      @id @default(cuid())
-  statement       String      @db.Text
-  status          ClaimStatus
-  confidenceScore Float
-  explanation     String      @db.Text
-  lastVerified    DateTime
-  storyId         String
-  story           Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  id                   String      @id @default(cuid())
+  statement            String      @db.Text
+  status               ClaimStatus
+  confidenceScore      Float
+  explanation          String      @db.Text
+  lastVerified         DateTime
+  storyId              String
+  story                Story       @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  /// Atomic-claim typing: what KIND of assertion this is. Opinions and
+  /// predictions may be quoted and attributed, never established as fact.
+  claimType            String      @default("STATEMENT")
+  /// Who asserted it, when the reporting names one ("the minister said X").
+  /// Null means the outlet itself asserts it. Stored, never inferred.
+  claimant             String?
+  /// Which pipeline/provider/version extracted it — provenance for "why did
+  /// ETHOS publish this sentence?" survives model swaps.
+  extractionProvenance String      @default("seed")
+  aiProvider           String?
+  aiModel              String?
 
   embedding Unsupported("vector(1536)")?
 
@@ -157,17 +252,23 @@ model PrimaryEvidence {
 }
 
 model ArticleSource {
-  id          String    @id @default(cuid())
-  url         String    @unique
+  id          String           @id @default(cuid())
+  url         String           @unique
   title       String
   author      String?
   publishedAt DateTime
   retrievedAt DateTime
-  snippet     String?   @db.Text
+  snippet     String?          @db.Text
   publisherId String
-  publisher   Publisher @relation(fields: [publisherId], references: [id])
+  publisher   Publisher        @relation(fields: [publisherId], references: [id])
   storyId     String
-  story       Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story       Story            @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  /// Role inside the story: the reporting contribution, e.g. REPORTING,
+  /// CORROBORATION, DISPUTE, PRIMARY_CONTEXT. Display-only, never a ranking.
+  role        String           @default("REPORTING")
+  /// Optional fast-path link back to the ingested candidate this source was
+  /// promoted from. URL match stays the primary provenance signal.
+  promotion   SourcePromotion?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,6 +288,20 @@ model SourceQuote {
   createdAt DateTime @default(now())
 
   @@index([claimId])
+}
+
+/// Promotion link: which ingested candidate an ArticleSource came from.
+/// Optional and SetNull so deleting a staging row never deletes curated
+/// history, and deleting curated rows never touches staging. The URL match
+/// stays the primary provenance signal; this column is the fast path.
+model SourcePromotion {
+  id             String        @id @default(cuid())
+  ingestedItemId String        @unique
+  ingestedItem   IngestedItem  @relation(fields: [ingestedItemId], references: [id], onDelete: Cascade)
+  articleId      String        @unique
+  article        ArticleSource @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  promotedAt     DateTime      @default(now())
+  promotedBy     String        @default("pipeline")
 }
 
 model DisputeQuote {
@@ -360,6 +475,8 @@ model IngestedItem {
   contentHash     String
   firstSeenAt     DateTime           @default(now())
   lastSeenAt      DateTime           @default(now())
+
+  promotion SourcePromotion?
 
   @@index([feedId])
   @@index([publishedAt])
