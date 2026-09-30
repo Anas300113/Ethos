@@ -165,6 +165,8 @@ async function replaceChildren(
           publisherId,
           storyId,
           role: "REPORTING",
+          sourcingGroup: source.sourcingGroup ?? null,
+          sharedSourceLabel: source.sharedSourceLabel ?? null,
         },
       });
       const ingested = await tx.ingestedItem.findUnique({
@@ -190,6 +192,12 @@ async function replaceChildren(
           summary: ev.summary,
           date: ev.date ?? null,
           excerpt: ev.excerpt ?? null,
+          relationship: ev.relationship ?? null,
+          relationshipReason: ev.relationshipReason ?? null,
+          supportingPassage: ev.supportingPassage ?? null,
+          assessmentMethod: ev.assessmentMethod ?? null,
+          assessmentModel: ev.assessmentModel ?? null,
+          assessedAt: ev.relationship ? new Date(story.lastUpdated) : null,
           storyId,
         },
       });
@@ -211,6 +219,8 @@ async function replaceChildren(
           extractionProvenance: options.extractionProvenance,
           aiProvider: options.aiProvider ?? null,
           aiModel: options.aiModel ?? null,
+          independentSourceCount: claim.independentSourceCount ?? null,
+          sourcingNote: claim.sourcingNote ?? null,
         },
       });
       const evidenceToConnect = claim.primaryEvidence

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractClaims } from "./claims";
+import { extractClaims, isHedgedClaim } from "./claims";
 
 describe("claim extraction", () => {
   it("splits the spec example into two atomic claims", () => {
@@ -42,6 +42,30 @@ describe("claim extraction", () => {
     );
     assert.equal(claim.claimType, "QUOTE");
     assert.ok(claim.claimant?.toLowerCase().includes("minister"));
+  });
+
+  it("marks hedged quotes attribution-only, so no document can bank the figure", () => {
+    // "The minister said the policy could cost £4bn" is quotable, but the
+    // £4bn is ventured, not stated — a supporting document must not be
+    // allowed to SUPPORT it as a bare fact.
+    const [hedged] = extractClaims(
+      "The minister said the policy could cost £4bn in total."
+    );
+    assert.equal(hedged.claimType, "QUOTE");
+    assert.equal(hedged.isAttributionOnly, true);
+    assert.ok(isHedgedClaim(hedged.statement));
+
+    // Unhedged quotes keep their old behaviour.
+    const [bare] = extractClaims(
+      "The minister said the fund will open in spring."
+    );
+    assert.equal(bare.isAttributionOnly, false);
+    assert.ok(!isHedgedClaim(bare.statement));
+
+    const [estimate] = extractClaims(
+      "The report estimated the scheme would save £2bn a year."
+    );
+    assert.equal(estimate.isAttributionOnly, true);
   });
 
   it("is deterministic and drops fragments", () => {

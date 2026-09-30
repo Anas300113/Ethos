@@ -4,17 +4,34 @@
  * deterministic text overlap. NEVER invents evidence: without a configured
  * search provider or a fetched supporting document, claims simply stay
  * UNVERIFIED / PARTIALLY_SUPPORTED — "not enough evidence" is a success.
+ *
+ * Each fetched candidate is RELATIONSHIP-assessed, not keyword-matched: a
+ * document that reports a figure to reject it becomes a DISPUTE source,
+ * never a supporting one.
  */
-import { documentSupportsClaim } from "./assess";
+import {
+  classifyRelationship,
+  type RelationshipVerdict,
+} from "./relationship";
 import type { EvidenceCandidate } from "../providers/types";
 import type { DocumentFetcher, EvidenceSearchProvider } from "../providers/types";
 import type { ClusterArticle } from "./assemble";
 
+export interface AssessedDocument {
+  candidate: EvidenceCandidate;
+  text: string;
+  verdict: RelationshipVerdict;
+}
+
 export interface RetrievedEvidence {
   /** Search hits — leads for editors, never persisted as "supporting" docs. */
   candidates: EvidenceCandidate[];
-  /** The first fetched document that supports the SPECIFIC claim, if any. */
+  /** The first fetched document that SUPPORTS the SPECIFIC claim, if any. */
   supportingDocument: (EvidenceCandidate & { text: string }) | null;
+  /** Full deterministic verdict for the supporting document, if any. */
+  supportingVerdict: RelationshipVerdict | null;
+  /** Fetched documents that report the claim only to deny it. */
+  contradictingDocuments: AssessedDocument[];
 }
 
 /** Bounded: three candidates, sequential fetches, hard timeouts in the fetcher. */
@@ -24,7 +41,7 @@ export async function retrieveEvidence(
   statement: string,
   search: EvidenceSearchProvider,
   fetcher: DocumentFetcher,
-  options?: { fetchDocuments?: boolean }
+  options?: { fetchDocuments?: boolean; claimType?: string; isAttributionOnly?: boolean }
 ): Promise<RetrievedEvidence> {
   let candidates: EvidenceCandidate[] = [];
   try {
@@ -35,18 +52,43 @@ export async function retrieveEvidence(
     // Search failure is ordinary: no candidates, claim stays unverified.
     candidates = [];
   }
-  if (options?.fetchDocuments === false) {
-    return { candidates, supportingDocument: null };
-  }
+  const withoutFetch = (list: EvidenceCandidate[]): RetrievedEvidence => ({
+    candidates: list,
+    supportingDocument: null,
+    supportingVerdict: null,
+    contradictingDocuments: [],
+  });
+  if (options?.fetchDocuments === false) return withoutFetch(candidates);
   for (const candidate of candidates.slice(0, MAX_EVIDENCE_CANDIDATES)) {
     if (!candidate.url.startsWith("http")) continue;
     const doc = await fetcher.fetchDocument(candidate.url);
     if (!doc) continue;
-    if (documentSupportsClaim(statement, doc.text)) {
-      return { candidates, supportingDocument: { ...candidate, text: doc.text } };
+    const verdict = classifyRelationship({
+      statement,
+      claimType: options?.claimType,
+      isAttributionOnly: options?.isAttributionOnly,
+      documentText: doc.text,
+    });
+    if (verdict.relationship === "SUPPORTS") {
+      return {
+        candidates,
+        supportingDocument: { ...candidate, text: doc.text },
+        supportingVerdict: verdict,
+        contradictingDocuments: [],
+      };
+    }
+    // A document that reports the claim to reject it is kept as dispute
+    // material — it must never be mistaken for ground later.
+    if (verdict.relationship === "CONTRADICTS") {
+      return {
+        candidates,
+        supportingDocument: null,
+        supportingVerdict: null,
+        contradictingDocuments: [{ candidate, text: doc.text, verdict }],
+      };
     }
   }
-  return { candidates, supportingDocument: null };
+  return withoutFetch(candidates);
 }
 
 /** Dispute verbs an outlet uses to contradict a claim. */

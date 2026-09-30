@@ -79,6 +79,34 @@ enum StoryStatus {
   ARCHIVED
 }
 
+/// How a fetched document relates to the claim it was retrieved for.
+/// Deterministic rules produce the first verdict; a model may refine it but
+/// may never UPGRADE it past what the deterministic checks allow.
+enum EvidenceRelationship {
+  SUPPORTS
+  CONTRADICTS
+  MENTIONS_ONLY
+  IRRELEVANT
+  UNCLEAR
+}
+
+/// Who decided a relationship. AI_HYBRID means a model contributed and the
+/// deterministic veto still had the final say — a model verdict never stands
+/// alone, so there is no "AI" method that could launder a hallucination.
+enum AssessmentMethod {
+  DETERMINISTIC
+  AI_HYBRID
+}
+
+/// Why a published story changed. Corrections and re-assessments are distinct
+/// from ordinary content updates because the reader must see them differently.
+enum UpdateKind {
+  PUBLISHED
+  CONTENT_UPDATE
+  CLAIM_REASSESSED
+  CORRECTION
+}
+
 model Publisher {
   id      String     @id @default(cuid())
   name    String
@@ -218,6 +246,14 @@ model Claim {
   aiProvider           String?
   aiModel              String?
 
+  /// How many INDEPENDENT sourcing groups report this claim — not the raw
+  /// outlet count. BBC + Guardian + a Reuters article quoting the same wire is
+  /// two groups, not three confirmations (see curation/independence.ts).
+  independentSourceCount Int?
+  /// Reader-facing note about shared sourcing, e.g.
+  /// "3 outlets, but 1 independent source (Reuters wire)".
+  sourcingNote           String? @db.Text
+
   embedding Unsupported("vector(1536)")?
 
   primaryEvidence PrimaryEvidence[]
@@ -240,6 +276,22 @@ model PrimaryEvidence {
   summary      String               @db.Text
   date         String?
   excerpt      String?              @db.Text
+
+  /// Assessed relationship to the claim(s) linked to this row. The pipeline
+  /// writes one evidence row per (claim, document) pair it relied on, so a
+  /// claim-scoped verdict on a story-level row is honest by construction.
+  /// Null on rows that predate assessment (e.g. hand-authored seed data).
+  relationship       EvidenceRelationship?
+  relationshipReason String?              @db.Text
+  /// The passage the verdict relies on, fair-use capped on write.
+  supportingPassage  String?              @db.Text
+  assessmentMethod   AssessmentMethod?
+  /// Which model contributed, when one did — never a bare "AI" label.
+  assessmentModel    String?
+  assessedAt         DateTime?
+  /// The URL actually fetched after every redirect hop was re-validated.
+  resolvedUrl        String?
+
   storyId      String
   story        Story                @relation(fields: [storyId], references: [id], onDelete: Cascade)
   claims       Claim[]
@@ -266,6 +318,12 @@ model ArticleSource {
   /// Role inside the story: the reporting contribution, e.g. REPORTING,
   /// CORROBORATION, DISPUTE, PRIMARY_CONTEXT. Display-only, never a ranking.
   role        String           @default("REPORTING")
+  /// Shared-sourcing key: "wire:reuters", "syndicated:<fingerprint>" or
+  /// "independent:<domain>". Two sources sharing a key are NOT two
+  /// confirmations; independence counting groups by this value.
+  sourcingGroup     String?
+  /// Reader-facing label for the shared origin ("Reuters", "independent").
+  sharedSourceLabel String?
   /// Optional fast-path link back to the ingested candidate this source was
   /// promoted from. URL match stays the primary provenance signal.
   promotion   SourcePromotion?
@@ -363,12 +421,28 @@ model StoryUpdate {
   timestamp   DateTime
   whatChanged String   @db.Text
   reason      String?  @db.Text
+  /// Why the story moved: new reporting, an explicit correction, or ETHOS
+  /// changing its own assessment of a claim. Readers see these differently.
+  kind        UpdateKind @default(CONTENT_UPDATE)
+  /// Soft reference to the claim concerned. Claim rows are deleted and
+  /// recreated by every curation run, so this is provenance TEXT, never a FK:
+  /// refreshing a story must never erase its correction history.
+  claimStatement String? @db.Text
+  claimId        String?
+  /// State before / after, so a correction is auditable rather than merely
+  /// mentioned. For a re-assessment these are the old and new claim statuses.
+  previousState  String? @db.Text
+  newState       String? @db.Text
+  /// Which reporting triggered the change, and the evidence behind it.
+  sourceLabel    String?
+  evidenceUrl    String?
   storyId     String
   story       Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([storyId])
+  @@index([kind])
 }
 
 // ---------------------------------------------------------------------------

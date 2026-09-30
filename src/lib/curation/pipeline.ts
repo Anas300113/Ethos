@@ -24,6 +24,11 @@ import {
 } from "./cluster";
 import { assessClaim, type Assessment } from "./assess";
 import {
+  groupSources,
+  sourcingNote,
+  type SourcedItem,
+} from "./independence";
+import {
   buildCorroboration,
   buildDispute,
   retrieveEvidence,
@@ -156,6 +161,7 @@ export function isOnStory(statement: string, core: Set<string>): boolean {
  */
 async function planClaims(
   slug: string,
+  topic: string,
   articles: ClusterArticle[],
   providers: ProviderBundle,
   log: (m: string) => void
@@ -190,6 +196,8 @@ async function planClaims(
         confidenceScore: 0.35,
         explanation: "Pending assessment.",
         sourceArticleId: article.id,
+        independentSourceCount: 0,
+        sourcingNote: null,
         evidence: [],
         corroborating: [],
         disputing: [],
@@ -207,39 +215,120 @@ async function planClaims(
 
   const plans: ClaimPlan[] = [];
   let evidenceIndex = 0;
+  // Source independence is computed ONCE per cluster, from the full article
+  // set: per-claim grouping would let a shared wire look independent.
+  const sourced = new Map<string, SourcedItem>(
+    groupSources(
+      articles.map((article) => ({
+        id: article.id,
+        publisherName: article.publisherName,
+        publisherDomain: article.publisherDomain,
+        title: article.title,
+        excerpt: article.excerpt,
+      }))
+    ).map((item) => [item.id, item])
+  );
   for (const plan of prioritised) {
     const source = articles.find((article) => article.id === plan.sourceArticleId);
     if (!source) continue;
     plan.corroborating = buildCorroboration(source, plan.statement, articles);
     plan.disputing = buildDispute(plan.statement, articles);
 
+    // Independence from the corroborating set + the source article itself.
+    const outlets = [
+      source.publisherName,
+      ...plan.corroborating.map((q) => q.publisherName),
+    ];
+    const byPublisher = new Map<string, SourcedItem>();
+    const sourceSourced = sourced.get(source.id);
+    if (sourceSourced) byPublisher.set(source.publisherName, sourceSourced);
+    for (const quote of plan.corroborating) {
+      const article = articles.find((candidate) => candidate.url === quote.url);
+      const grouped = article ? sourced.get(article.id) : undefined;
+      if (grouped && !byPublisher.has(quote.publisherName)) {
+        byPublisher.set(quote.publisherName, grouped);
+      }
+    }
+    const claimSourced = [...byPublisher.values()];
+    const sourcingGroups = [...new Set(claimSourced.map((item) => item.sourcingGroup))];
+    const independenceNote = claimSourced.length > 0 ? sourcingNote(claimSourced) : null;
+    plan.independentSourceCount = sourcingGroups.length;
+    plan.sourcingNote = independenceNote;
+
     const retrieval = await retrieveEvidence(plan.statement, providers.evidenceSearch, providers.documentFetcher, {
       // The allowlist provider returns SEARCH URLs, not documents: fetching
       // them would waste a request on a results page and never support a
       // claim. Fetching happens for real document URLs (remote provider).
       fetchDocuments: providers.evidenceSearch.name !== "allowlist-local",
+      claimType: plan.claimType,
+      isAttributionOnly: plan.isAttributionOnly,
     });
+
+    // A fetched document that reports the claim only to deny it is dispute
+    // material for the dossier, not ground: append it as a disputing quote.
+    for (const contradicting of retrieval.contradictingDocuments) {
+      plan.disputing.push({
+        publisherName: contradicting.candidate.issuingBody,
+        url: contradicting.candidate.url,
+        quote: (contradicting.verdict.passage ?? contradicting.text).slice(0, 250),
+        disputeReason: `Fetched document contests the claim: ${contradicting.verdict.reason}`.slice(0, 500),
+      });
+    }
+
+    // Second semantic read: when a real provider is configured, ask it to
+    // classify the same (claim, document) pair. ADVISORY only — assessClaim
+    // reconciles it through the deterministic veto (confirm or downgrade,
+    // never upgrade). In development mode assessEvidence is absent/null and
+    // the verdict is purely deterministic, labelled as such.
+    let aiRelationship = null;
+    if (retrieval.supportingDocument && providers.ai.assessEvidence) {
+      aiRelationship = await providers.ai.assessEvidence({
+        claim: {
+          statement: plan.statement,
+          claimType: plan.claimType,
+          claimant: plan.claimant,
+          isAttributionOnly: plan.isAttributionOnly,
+        },
+        document: {
+          title: retrieval.supportingDocument.title,
+          text: retrieval.supportingDocument.text,
+          url: retrieval.supportingDocument.url,
+          source: retrieval.supportingDocument.issuingBody,
+          documentType: retrieval.supportingDocument.documentType,
+        },
+        context: { topic, publisherCount: articles.length },
+      });
+    }
 
     const assessment: Assessment = assessClaim({
       statement: plan.statement,
       claimType: plan.claimType,
       claimant: plan.claimant,
       isAttributionOnly: plan.isAttributionOnly,
-      reportingOutlets: [
-        source.publisherName,
-        ...plan.corroborating.map((q) => q.publisherName),
-      ],
+      reportingOutlets: outlets,
+      sourcingGroups,
+      sourcingNote: independenceNote,
       corroboratingQuotes: plan.corroborating,
       disputingQuotes: plan.disputing,
       primaryDocumentText: retrieval.supportingDocument?.text ?? null,
       primaryDocumentTitle: retrieval.supportingDocument?.title,
       primaryDocumentBody: retrieval.supportingDocument?.issuingBody,
+      aiRelationship,
+      aiModel: providers.ai.name,
     });
 
     plan.status = assessment.status;
     plan.confidenceScore = assessment.confidenceScore;
     plan.explanation = assessment.explanation;
-    if (retrieval.supportingDocument) {
+    // Attach the document ONLY when the reconciled verdict still says
+    // SUPPORTS: an AI downgrade (or a deterministic veto) means the document
+    // may not be presented to the reader as ground for this claim.
+    if (
+      retrieval.supportingDocument &&
+      assessment.documentGrounded &&
+      assessment.verdict.relationship === "SUPPORTS"
+    ) {
+      const verdict = assessment.verdict;
       evidenceIndex += 1;
       plan.evidence = [
         {
@@ -251,6 +340,11 @@ async function planClaims(
           summary: retrieval.supportingDocument.summary.slice(0, 1000),
           date: retrieval.supportingDocument.date,
           excerpt: retrieval.supportingDocument.text.slice(0, 250),
+          relationship: "SUPPORTS",
+          relationshipReason: verdict.reason.slice(0, 1000),
+          supportingPassage: verdict.passage?.slice(0, 250) ?? null,
+          assessmentMethod: assessment.assessmentMethod,
+          assessmentModel: assessment.assessmentModel,
         },
       ];
     }
@@ -377,7 +471,7 @@ async function curateCluster(
   const articles = existing ? mergeWithExisting(existing, members) : members;
   const topic = cluster.topic as StoryTopic;
   const headline = articles[0]?.title ?? slug;
-  const claims = await planClaims(slug, articles, providers, log);
+  const claims = await planClaims(slug, topic, articles, providers, log);
 
   const generated = await providers.ai.generateStory(
     buildGenerationInput(headline, topic, claims, articles)

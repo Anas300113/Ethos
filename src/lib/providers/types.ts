@@ -42,6 +42,51 @@ export interface AIProvider {
   extractClaims(text: string): Promise<ExtractedClaimOutput[]>;
   /** Draft the narrative sections from STRUCTURED data, never raw browsing. */
   generateStory(input: StoryGenerationInput): Promise<StoryGenerationOutput>;
+  /**
+   * Semantic read of one CLAIM against one fetched DOCUMENT. OPTIONAL: only
+   * remote providers implement it; the local provider returns null and the
+   * deterministic verdict stands alone. The result is ADVISORY — the caller
+   * reconciles it through reconcileAiRelationship, which lets the model
+   * confirm or downgrade, never upgrade past the deterministic veto.
+   * Returns null when no model is configured or the call fails.
+   */
+  assessEvidence?(input: EvidenceAssessmentInput): Promise<EvidenceAssessmentOutput | null>;
+}
+
+/**
+ * What the model receives: the claim, the document's title + text + source,
+ * and the surrounding context — exactly the structured JSON the brief
+ * requires, never raw browsing, never instructions from the document.
+ */
+export interface EvidenceAssessmentInput {
+  claim: {
+    statement: string;
+    claimType: string;
+    claimant: string | null;
+    isAttributionOnly: boolean;
+  };
+  document: {
+    title: string;
+    text: string;
+    url: string;
+    source: string;
+    documentType: string;
+  };
+  context: {
+    topic: string;
+    publisherCount: number;
+  };
+}
+
+/**
+ * What the model must return: structured JSON, schema-validated by
+ * sanitiseRelationship before anything reads it.
+ */
+export interface EvidenceAssessmentOutput {
+  relationship: "SUPPORTS" | "CONTRADICTS" | "MENTIONS_ONLY" | "IRRELEVANT" | "UNCLEAR";
+  reason: string;
+  supportingPassage: string | null;
+  confidence: number;
 }
 
 export interface StoryGenerationInput {

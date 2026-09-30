@@ -51,6 +51,24 @@ const POLICY_MARKERS =
 const STATISTIC_MARKERS =
   /\b(percent|percentage|rate|rose|fell|increased|decreased|growth|inflation|unemployment|poll|survey|study|research|figures?|data|statistics)\b/i;
 
+/**
+ * Hedge words in a CLAIM ("could cost £4bn") distinguish estimates, forecasts
+ * and conditionals from bare facts — the same distinction the relationship
+ * classifier enforces on documents. QUOTE carrying an estimate is still
+ * attribution-only: the passage tells us someone VENTURED a number, which no
+ * document should then be allowed to SUPPORT as a fact.
+ *
+ * Deliberately narrower than PREDICTION_MARKERS: bare future tense ("will
+ * open") is a reportable commitment, not a hedge — only uncertainty about
+ * the FACT CONTENT (could/might/may/estimates/up-to/if) quarantines a claim.
+ */
+const CLAIM_HEDGE_PATTERN =
+  /\b(could|might|may|possibly|potentially|expected to|set to|up to|around|approximately|estimated?|forecast|predicted|projected|if\b|whether|subject to|hopes? to|aims? to|plans? to|would|likely)\b/i;
+
+export function isHedgedClaim(sentence: string): boolean {
+  return CLAIM_HEDGE_PATTERN.test(sentence);
+}
+
 function findClaimant(sentence: string): string | null {
   for (const pattern of CLAIMANT_PATTERNS) {
     const match = pattern.exec(sentence);
@@ -70,8 +88,11 @@ function classify(sentence: string): {
   if (OPINION_MARKERS.test(sentence)) {
     return { claimType: "OTHER", isAttributionOnly: true };
   }
+  // A hedged QUOTE ("could cost £4bn") is still quotable but never
+  // establishable: someone ventured a number, and no document may SUPPORT
+  // that number as a bare fact on this passage's authority.
   if (QUOTE_VERBS.test(sentence)) {
-    return { claimType: "QUOTE", isAttributionOnly: false };
+    return { claimType: "QUOTE", isAttributionOnly: isHedgedClaim(sentence) };
   }
   if (PREDICTION_MARKERS.test(sentence)) {
     return { claimType: "PREDICTION", isAttributionOnly: true };

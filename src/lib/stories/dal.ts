@@ -37,6 +37,8 @@ function toClaim(row: StoryRow["claims"][number]): Claim {
     explanation: row.explanation,
     claimType: row.claimType,
     claimant: row.claimant,
+    independentSourceCount: row.independentSourceCount,
+    sourcingNote: row.sourcingNote,
     primaryEvidence: row.primaryEvidence.map((ev) => ({
       id: ev.id,
       title: ev.title,
@@ -46,6 +48,11 @@ function toClaim(row: StoryRow["claims"][number]): Claim {
       summary: ev.summary,
       date: ev.date ?? undefined,
       excerpt: ev.excerpt ?? undefined,
+      relationship: ev.relationship,
+      relationshipReason: ev.relationshipReason,
+      supportingPassage: ev.supportingPassage,
+      assessmentMethod: ev.assessmentMethod,
+      assessmentModel: ev.assessmentModel,
     })),
     corroboratingSources: row.corroborating.map((q) => ({
       publisherName: q.publisherName,
@@ -115,6 +122,8 @@ function toStory(row: StoryRow, relatedStoryIds: string[] = []): Story {
       publishedAt: source.publishedAt.toISOString(),
       retrievedAt: source.retrievedAt.toISOString(),
       snippet: source.snippet ?? undefined,
+      sourcingGroup: source.sourcingGroup ?? undefined,
+      sharedSourceLabel: source.sharedSourceLabel ?? undefined,
       publisher: {
         id: source.publisher.id,
         name: source.publisher.name,
@@ -128,6 +137,12 @@ function toStory(row: StoryRow, relatedStoryIds: string[] = []): Story {
       timestamp: update.timestamp.toISOString(),
       whatChanged: update.whatChanged,
       reason: update.reason ?? undefined,
+      kind: update.kind,
+      claimStatement: update.claimStatement,
+      previousState: update.previousState,
+      newState: update.newState,
+      sourceLabel: update.sourceLabel,
+      evidenceUrl: update.evidenceUrl,
     })),
     relatedStoryIds,
   };

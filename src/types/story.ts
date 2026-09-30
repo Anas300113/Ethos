@@ -42,7 +42,19 @@ export interface ArticleSource {
   publishedAt: string;
   retrievedAt: string;
   snippet?: string;
+  /** Shared-sourcing key (wire:<agency> / syndicated:<fp> / independent:<domain>). */
+  sourcingGroup?: string;
+  /** Reader-facing label for the shared origin ("Reuters", "independent"). */
+  sharedSourceLabel?: string;
 }
+
+/** How a fetched document relates to the claim it was assessed against. */
+export type EvidenceRelationship =
+  | "SUPPORTS"
+  | "CONTRADICTS"
+  | "MENTIONS_ONLY"
+  | "IRRELEVANT"
+  | "UNCLEAR";
 
 export interface PrimaryEvidence {
   id: string;
@@ -59,6 +71,12 @@ export interface PrimaryEvidence {
   summary: string;
   date?: string;
   excerpt?: string;
+  /** Assessed relationship to the linked claim(s); null on pre-assessment rows. */
+  relationship?: EvidenceRelationship | null;
+  relationshipReason?: string | null;
+  supportingPassage?: string | null;
+  assessmentMethod?: "DETERMINISTIC" | "AI_HYBRID" | null;
+  assessmentModel?: string | null;
 }
 
 export interface Claim {
@@ -71,6 +89,10 @@ export interface Claim {
   claimType?: string;
   /** Who asserted it when the reporting names one ("the minister said X"). */
   claimant?: string | null;
+  /** Independent sourcing groups behind this claim, not the raw outlet count. */
+  independentSourceCount?: number | null;
+  /** Reader-facing note when outlets repeat a shared source. */
+  sourcingNote?: string | null;
   primaryEvidence: PrimaryEvidence[];
   corroboratingSources: {
     publisherName: string;
@@ -112,6 +134,14 @@ export interface StoryUpdate {
   timestamp: string;
   whatChanged: string;
   reason?: string;
+  /** Why the story moved: content, correction, or ETHOS re-assessment. */
+  kind?: "PUBLISHED" | "CONTENT_UPDATE" | "CLAIM_REASSESSED" | "CORRECTION";
+  /** Soft reference to the claim concerned (provenance text, never a FK). */
+  claimStatement?: string | null;
+  previousState?: string | null;
+  newState?: string | null;
+  sourceLabel?: string | null;
+  evidenceUrl?: string | null;
 }
 
 export interface Story {

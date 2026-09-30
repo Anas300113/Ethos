@@ -10,6 +10,7 @@
  */
 import type { ArticleSource, Claim, Story, StoryTopic, TimelineEvent } from "@/types/story";
 import { resolveStance } from "@/lib/stance";
+import { groupSources, type SourcedItem } from "./independence";
 import type { StoryGenerationOutput } from "../providers/types";
 
 export interface ClusterArticle {
@@ -34,6 +35,10 @@ export interface ClaimPlan {
   explanation: string;
   /** Article the claim text was extracted from — its URL is the citation. */
   sourceArticleId: string;
+  /** Independent sourcing groups behind this claim (see independence). */
+  independentSourceCount: number;
+  /** Reader-facing note when outlets repeat a shared source. */
+  sourcingNote: string | null;
   evidence: Claim["primaryEvidence"];
   corroborating: Claim["corroboratingSources"];
   disputing: NonNullable<Claim["disputingSources"]>;
@@ -104,23 +109,41 @@ export function assembleStory(input: AssembleInput): Story {
   const articles = [...input.articles].sort(
     (a, b) => a.publishedAt.getTime() - b.publishedAt.getTime()
   );
-  const sources: ArticleSource[] = articles.map((article) => ({
-    id: article.id,
-    url: article.url,
-    title: truncate(article.title, MAX_SNIPPET_CHARS + 100),
-    author: article.author ?? undefined,
-    publishedAt: article.publishedAt.toISOString(),
-    retrievedAt: article.publishedAt.toISOString(),
-    snippet: article.excerpt ? truncate(article.excerpt, MAX_SNIPPET_CHARS) : undefined,
-    publisher: {
-      // Domain doubles as a stable stand-in id for UI keys; the DB write
-      // path resolves the real Publisher row by domain.
-      id: article.publisherDomain,
-      name: article.publisherName,
-      domain: article.publisherDomain,
-      tier: article.publisherTier,
-    },
-  }));
+  // Sourcing groups travel with articles into the dossier: the reader sees
+  // which outlets share a wire, not just a raw outlet count (AGENTS.md).
+  const sourcedById = new Map<string, SourcedItem>(
+    groupSources(
+      articles.map((article) => ({
+        id: article.id,
+        publisherName: article.publisherName,
+        publisherDomain: article.publisherDomain,
+        title: article.title,
+        excerpt: article.excerpt,
+      }))
+    ).map((item) => [item.id, item])
+  );
+  const sources: ArticleSource[] = articles.map((article) => {
+    const sourced = sourcedById.get(article.id);
+    return {
+      id: article.id,
+      url: article.url,
+      title: truncate(article.title, MAX_SNIPPET_CHARS + 100),
+      author: article.author ?? undefined,
+      publishedAt: article.publishedAt.toISOString(),
+      retrievedAt: article.publishedAt.toISOString(),
+      snippet: article.excerpt ? truncate(article.excerpt, MAX_SNIPPET_CHARS) : undefined,
+      sourcingGroup: sourced?.sourcingGroup,
+      sharedSourceLabel: sourced?.sharedSourceLabel,
+      publisher: {
+        // Domain doubles as a stable stand-in id for UI keys; the DB write
+        // path resolves the real Publisher row by domain.
+        id: article.publisherDomain,
+        name: article.publisherName,
+        domain: article.publisherDomain,
+        tier: article.publisherTier,
+      },
+    };
+  });
 
   const claims: Claim[] = input.claims.map((plan, index) => ({
     id: `${input.slug}-c${index + 1}`,
@@ -130,6 +153,8 @@ export function assembleStory(input: AssembleInput): Story {
     explanation: plan.explanation,
     claimType: plan.claimType,
     claimant: plan.claimant ?? undefined,
+    independentSourceCount: plan.independentSourceCount,
+    sourcingNote: plan.sourcingNote ?? undefined,
     primaryEvidence: plan.evidence,
     corroboratingSources: plan.corroborating,
     disputingSources: plan.disputing.length > 0 ? plan.disputing : undefined,

@@ -4,7 +4,12 @@ import { isFetchableUrl } from "./documents";
 import { AllowlistEvidenceSearch } from "./evidence";
 import { constructProviders } from "./index";
 import { LocalAIProvider } from "./local-ai";
-import { sanitiseClaims, sanitiseStory, wrapUntrusted } from "./remote-ai";
+import {
+  sanitiseClaims,
+  sanitiseRelationship,
+  sanitiseStory,
+  wrapUntrusted,
+} from "./remote-ai";
 
 describe("providers", () => {
   it("defaults to local providers with zero credentials", () => {
@@ -53,6 +58,32 @@ describe("providers", () => {
     assert.equal(story.headline, "H");
     assert.deepEqual(story.whatWeKnow, ["a", "b"]);
     assert.deepEqual(story.whatIsUnclear, []);
+  });
+
+  it("schema-validates AI evidence verdicts, rejecting anything off-spec", () => {
+    const good = sanitiseRelationship({
+      relationship: "SUPPORTS",
+      reason: "The document states the figure plainly.",
+      supportingPassage: "The policy costs £4bn, the Treasury confirmed.",
+      confidence: 0.9,
+    });
+    assert.equal(good.relationship, "SUPPORTS");
+    assert.equal(good.confidence, 0.9);
+    // Off-spec verdicts throw: the caller must fall back to the
+    // deterministic verdict, never trust the model raw.
+    assert.throws(
+      () => sanitiseRelationship({ relationship: "PROBABLY", reason: "x", confidence: 0.5 }),
+      /invalid relationship/
+    );
+    assert.throws(
+      () => sanitiseRelationship({ relationship: "SUPPORTS", reason: "x", confidence: 2 }),
+      /confidence/
+    );
+    assert.throws(() => sanitiseRelationship("supports"), /expected a JSON object/);
+    // Missing reason/passage degrade to safe defaults, not to support.
+    const thin = sanitiseRelationship({ relationship: "UNCLEAR", confidence: 0.2 });
+    assert.equal(thin.reason, "No reason supplied.");
+    assert.equal(thin.supportingPassage, null);
   });
 
   it("allowlist search never fabricates documents", async () => {
