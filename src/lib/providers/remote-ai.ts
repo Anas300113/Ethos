@@ -13,6 +13,7 @@
 import { extractClaims as localExtract } from "../curation/claims";
 import type {
   AIProvider,
+  ClaimExtraction,
   EvidenceAssessmentInput,
   EvidenceAssessmentOutput,
   ExtractedClaimOutput,
@@ -152,6 +153,23 @@ export function sanitiseStory(
   };
 }
 
+/** Deterministic extractor output -> provider output shape, with no URL. */
+function toClaimOutput(claim: {
+  statement: string;
+  claimType: string;
+  claimant: string | null;
+  isAttributionOnly: boolean;
+}): ExtractedClaimOutput {
+  return {
+    statement: claim.statement,
+    claimType: claim.claimType,
+    claimant: claim.claimant,
+    isAttributionOnly: claim.isAttributionOnly,
+    sourceUrl: "",
+    sourcePublisher: "",
+  };
+}
+
 export class RemoteAIProvider implements AIProvider {
   readonly name: string;
   private readonly apiKey: string;
@@ -207,16 +225,14 @@ export class RemoteAIProvider implements AIProvider {
     }
   }
 
-  async extractClaims(text: string): Promise<ExtractedClaimOutput[]> {
+  async extractClaims(text: string): Promise<ClaimExtraction> {
     if (!this.configured) {
-      return localExtract(text).map((claim) => ({
-        statement: claim.statement,
-        claimType: claim.claimType,
-        claimant: claim.claimant,
-        isAttributionOnly: claim.isAttributionOnly,
-        sourceUrl: "",
-        sourcePublisher: "",
-      }));
+      // Not configured: deterministic extraction, labelled as such. A provider
+      // class without credentials must never claim model output.
+      return {
+        claims: localExtract(text).map(toClaimOutput),
+        provenance: "local-deterministic",
+      };
     }
     try {
       const content = await this.complete(EXTRACT_SYSTEM, wrapUntrusted(text));
@@ -224,21 +240,21 @@ export class RemoteAIProvider implements AIProvider {
       const parsed = JSON.parse(content) as unknown;
       const array =
         isRecord(parsed) && Array.isArray(parsed.claims) ? parsed.claims : parsed;
-      return sanitiseClaims(array);
+      return {
+        claims: sanitiseClaims(array),
+        provenance: `remote:${this.name}`,
+      };
     } catch (error) {
       // A model failure must never publish: fall back to deterministic
-      // extraction and let the caller label the provenance honestly.
+      // extraction and SAY SO — the claim rows carry the fallback label, so
+      // local output can never be presented later as AI-generated.
       console.error(
         `[ethos:ai] extractClaims failed, using local fallback: ${String(error)}`
       );
-      return localExtract(text).map((claim) => ({
-        statement: claim.statement,
-        claimType: claim.claimType,
-        claimant: claim.claimant,
-        isAttributionOnly: claim.isAttributionOnly,
-        sourceUrl: "",
-        sourcePublisher: "",
-      }));
+      return {
+        claims: localExtract(text).map(toClaimOutput),
+        provenance: "local-deterministic:fallback",
+      };
     }
   }
 

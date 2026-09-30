@@ -37,6 +37,7 @@ function toClaim(row: StoryRow["claims"][number]): Claim {
     explanation: row.explanation,
     claimType: row.claimType,
     claimant: row.claimant,
+    extractionProvenance: row.extractionProvenance,
     independentSourceCount: row.independentSourceCount,
     sourcingNote: row.sourcingNote,
     primaryEvidence: row.primaryEvidence.map((ev) => ({

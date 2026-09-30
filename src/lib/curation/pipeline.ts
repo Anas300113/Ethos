@@ -38,6 +38,8 @@ import {
   type ClaimPlan,
   type ClusterArticle,
 } from "./assemble";
+import { groundingIssues } from "./grounding";
+import { generateLocalStory } from "../providers/local-ai";
 import { persistStory, type PersistResult } from "./persist";
 import { validateStory } from "@/lib/verification";
 
@@ -175,7 +177,8 @@ async function planClaims(
   let offStory = 0;
   for (const article of sources) {
     const text = `${article.title}. ${article.excerpt ?? ""}`;
-    const extracted = await providers.ai.extractClaims(text);
+    const extraction = await providers.ai.extractClaims(text);
+    const extracted = extraction.claims;
     for (const claim of extracted) {
       const key = normaliseForDedupe(claim.statement);
       if (!key || seen.has(key)) continue;
@@ -196,6 +199,7 @@ async function planClaims(
         confidenceScore: 0.35,
         explanation: "Pending assessment.",
         sourceArticleId: article.id,
+        extractionProvenance: extraction.provenance,
         independentSourceCount: 0,
         sourcingNote: null,
         evidence: [],
@@ -473,9 +477,42 @@ async function curateCluster(
   const headline = articles[0]?.title ?? slug;
   const claims = await planClaims(slug, topic, articles, providers, log);
 
-  const generated = await providers.ai.generateStory(
-    buildGenerationInput(headline, topic, claims, articles)
-  );
+  const generationInput = buildGenerationInput(headline, topic, claims, articles);
+  let generated = await providers.ai.generateStory(generationInput);
+
+  // Final grounding check (req 9): every factual sentence must map to a
+  // stored claim. A failure REJECTS the generation — fall back to the
+  // deterministic composer, which is template-grounded by construction, and
+  // label the story accordingly so prose provenance stays honest.
+  const claimStatements = claims.map((claim) => ({ statement: claim.statement }));
+  const ungrounded = groundingIssues(generated, claimStatements);
+  let proseProvider = providers.report.ai.name;
+  let proseModel =
+    providers.report.ai.kind === "local" ? null : (process.env.AI_MODEL ?? "configured-model");
+  if (ungrounded.length > 0) {
+    log(
+      `   GROUNDING: rejected ${providers.report.ai.kind} generation — ` +
+        `${ungrounded.length} untraceable sentence(s) (e.g. "${ungrounded[0].sentence.slice(0, 80)}…"); ` +
+        "falling back to deterministic composition."
+    );
+    generated = generateLocalStory(generationInput);
+    proseProvider = "local-deterministic";
+    proseModel = null;
+    const retry = groundingIssues(generated, claimStatements);
+    if (retry.length > 0) {
+      // Even the deterministic composer failed to ground its own output:
+      // that is a bug in the templates, and it must block publication.
+      return {
+        kind: "gateBlocked",
+        slug,
+        issues: retry.map(
+          (issue) =>
+            `PROSE_UNGROUNDED: ${issue.field} sentence not traceable to any claim — ${issue.sentence}`
+        ),
+      };
+    }
+  }
+
   const now = options.now?.() ?? new Date();
   const story = assembleStory({
     slug,
@@ -520,8 +557,8 @@ async function curateCluster(
 
   const result = await persistStory(prisma, story, {
     extractionProvenance: `${providers.ai.name}@mvp-1`,
-    aiProvider: providers.report.ai.name,
-    aiModel: providers.report.ai.kind === "local" ? null : (process.env.AI_MODEL ?? "configured-model"),
+    aiProvider: proseProvider,
+    aiModel: proseModel,
     generatedAt: now,
     updateSummary,
   });

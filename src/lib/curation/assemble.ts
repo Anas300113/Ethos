@@ -35,6 +35,8 @@ export interface ClaimPlan {
   explanation: string;
   /** Article the claim text was extracted from — its URL is the citation. */
   sourceArticleId: string;
+  /** Honest extraction label: "remote:<name>" | "local-deterministic[:fallback]". */
+  extractionProvenance: string;
   /** Independent sourcing groups behind this claim (see independence). */
   independentSourceCount: number;
   /** Reader-facing note when outlets repeat a shared source. */
@@ -153,6 +155,7 @@ export function assembleStory(input: AssembleInput): Story {
     explanation: plan.explanation,
     claimType: plan.claimType,
     claimant: plan.claimant ?? undefined,
+    extractionProvenance: plan.extractionProvenance,
     independentSourceCount: plan.independentSourceCount,
     sourcingNote: plan.sourcingNote ?? undefined,
     primaryEvidence: plan.evidence,

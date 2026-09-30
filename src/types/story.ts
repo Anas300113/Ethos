@@ -89,6 +89,12 @@ export interface Claim {
   claimType?: string;
   /** Who asserted it when the reporting names one ("the minister said X"). */
   claimant?: string | null;
+  /**
+   * Honest label for WHERE this claim sentence came from: "remote:<model>",
+   * "local-deterministic", or "local-deterministic:fallback" when a
+   * configured model failed and the deterministic extractor took over.
+   */
+  extractionProvenance?: string;
   /** Independent sourcing groups behind this claim, not the raw outlet count. */
   independentSourceCount?: number | null;
   /** Reader-facing note when outlets repeat a shared source. */

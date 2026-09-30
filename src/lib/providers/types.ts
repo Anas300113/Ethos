@@ -36,10 +36,22 @@ export interface ExtractedClaimOutput extends ClaimInput {
   isAttributionOnly: boolean;
 }
 
+/**
+ * Extraction result: the claims themselves PLUS an honest provenance label.
+ * The label travels to the Claim row so a reader (or an auditor) can see
+ * whether a model or the deterministic extractor produced a given sentence —
+ * a remote call that fails must never be recorded as AI output.
+ */
+export interface ClaimExtraction {
+  claims: ExtractedClaimOutput[];
+  /** "remote:<name>", "local-deterministic", or "local-deterministic:fallback". */
+  provenance: string;
+}
+
 export interface AIProvider {
   readonly name: string;
   /** Split prose into atomic claims. Must return the deterministic shapes. */
-  extractClaims(text: string): Promise<ExtractedClaimOutput[]>;
+  extractClaims(text: string): Promise<ClaimExtraction>;
   /** Draft the narrative sections from STRUCTURED data, never raw browsing. */
   generateStory(input: StoryGenerationInput): Promise<StoryGenerationOutput>;
   /**

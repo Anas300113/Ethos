@@ -11,7 +11,7 @@
 import { extractClaims } from "../curation/claims";
 import type {
   AIProvider,
-  ExtractedClaimOutput,
+  ClaimExtraction,
   StoryGenerationInput,
   StoryGenerationOutput,
 } from "./types";
@@ -31,15 +31,18 @@ function joinReadable(items: string[]): string {
 export class LocalAIProvider implements AIProvider {
   readonly name = "local-deterministic";
 
-  async extractClaims(text: string): Promise<ExtractedClaimOutput[]> {
-    return extractClaims(text).map((claim) => ({
-      statement: claim.statement,
-      claimType: claim.claimType,
-      claimant: claim.claimant,
-      isAttributionOnly: claim.isAttributionOnly,
-      sourceUrl: "",
-      sourcePublisher: "",
-    }));
+  async extractClaims(text: string): Promise<ClaimExtraction> {
+    return {
+      claims: extractClaims(text).map((claim) => ({
+        statement: claim.statement,
+        claimType: claim.claimType,
+        claimant: claim.claimant,
+        isAttributionOnly: claim.isAttributionOnly,
+        sourceUrl: "",
+        sourcePublisher: "",
+      })),
+      provenance: "local-deterministic",
+    };
   }
 
   async generateStory(input: StoryGenerationOutputInput): Promise<StoryGenerationOutput> {

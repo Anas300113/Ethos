@@ -216,7 +216,9 @@ async function replaceChildren(
           storyId,
           claimType: claim.claimType ?? "STATEMENT",
           claimant: claim.claimant ?? null,
-          extractionProvenance: options.extractionProvenance,
+          // Per-claim label wins: it distinguishes remote extraction from a
+          // deterministic fallback inside the same story.
+          extractionProvenance: claim.extractionProvenance ?? options.extractionProvenance,
           aiProvider: options.aiProvider ?? null,
           aiModel: options.aiModel ?? null,
           independentSourceCount: claim.independentSourceCount ?? null,

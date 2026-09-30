@@ -4,6 +4,7 @@ import { isFetchableUrl } from "./documents";
 import { AllowlistEvidenceSearch } from "./evidence";
 import { constructProviders } from "./index";
 import { LocalAIProvider } from "./local-ai";
+import { RemoteAIProvider } from "./remote-ai";
 import {
   sanitiseClaims,
   sanitiseRelationship,
@@ -102,6 +103,35 @@ describe("providers", () => {
     assert.equal(isFetchableUrl("ftp://example.com/file"), false);
     assert.equal(isFetchableUrl("https://user:pass@example.com/"), false);
     assert.equal(isFetchableUrl("https://www.gov.uk/search?q=housing"), true);
+  });
+
+  it("labels extraction provenance honestly across remote/fallback/local", async () => {
+    // Configured but broken endpoint -> model call fails -> deterministic
+    // fallback, and the label SAYS fallback (never "remote").
+    const broken = new RemoteAIProvider({
+      apiKey: "sk-test",
+      endpoint: "not-a-valid-url",
+      name: "openai",
+    });
+    const fellBack = await broken.extractClaims(
+      "The government announced a £4bn housing programme today."
+    );
+    assert.equal(fellBack.provenance, "local-deterministic:fallback");
+    assert.ok(fellBack.claims.length > 0);
+
+    // Unconfigured provider: deterministic, labelled local — a provider
+    // class without credentials must never claim model output.
+    const unconfigured = new RemoteAIProvider({ apiKey: "" });
+    const local = await unconfigured.extractClaims(
+      "The government announced a £4bn housing programme today."
+    );
+    assert.equal(local.provenance, "local-deterministic");
+
+    // The local provider always says local.
+    const direct = await new LocalAIProvider().extractClaims(
+      "The government announced a £4bn housing programme today."
+    );
+    assert.equal(direct.provenance, "local-deterministic");
   });
 
   it("local story generation only uses structured inputs", async () => {
