@@ -12,6 +12,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Story } from "@/types/story";
 import { resolveStance } from "@/lib/stance";
 import { validateStory } from "@/lib/verification";
+import { buildUpdateHistory } from "./history";
 
 export interface PersistOptions {
   /** Claim extraction provenance label for every row, e.g. "local-regex@1". */
@@ -68,7 +69,14 @@ export async function persistStory(
 
   const existing = await prisma.story.findUnique({
     where: { slug: story.slug },
-    select: { id: true, version: true },
+    select: {
+      id: true,
+      version: true,
+      // Previous claim statuses drive the re-assessment/correction history,
+      // and previous sources identify which reporting triggered an update.
+      claims: { select: { statement: true, status: true } },
+      sources: { select: { url: true, publisher: { select: { name: true } } } },
+    },
   });
   const created = existing === null;
   const version = created ? 1 : existing.version + 1;
@@ -117,20 +125,25 @@ export async function persistStory(
   });
   const storyId = storyRow.id;
 
-  await replaceChildren(prisma, story, storyId, options);
-
-  if (options.updateSummary) {
-    await prisma.storyUpdate.create({
-      data: {
-        timestamp: now,
-        whatChanged: options.updateSummary.slice(0, 2000),
-        reason: "pipeline",
-        storyId,
-      },
-    });
-  }
+  // StoryUpdates (publish note, content update, claim re-assessments and
+  // corrections) are written INSIDE the same transaction as the new children,
+  // so history can never drift from the claims it describes. Prior update
+  // rows are never deleted — replaceChildren does not touch them.
+  await replaceChildren(prisma, story, storyId, options, {
+    created,
+    now,
+    previousClaims: existing?.claims ?? [],
+    previousSources: existing?.sources ?? [],
+  });
 
   return { storyId, slug: story.slug, created, version };
+}
+
+interface ReplaceContext {
+  created: boolean;
+  now: Date;
+  previousClaims: { statement: string; status: string }[];
+  previousSources: { url: string; publisher: { name: string } }[];
 }
 
 /**
@@ -142,7 +155,8 @@ async function replaceChildren(
   prisma: PrismaClient,
   story: Story,
   storyId: string,
-  options: PersistOptions
+  options: PersistOptions,
+  context: ReplaceContext
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.claim.deleteMany({ where: { storyId } });
@@ -150,6 +164,9 @@ async function replaceChildren(
     await tx.articleSource.deleteMany({ where: { storyId } });
     await tx.sourceComparisonItem.deleteMany({ where: { storyId } });
     await tx.timelineEvent.deleteMany({ where: { storyId } });
+
+    // Rows written this pass, for the status diff against previousClaims.
+    const writtenClaims: { id: string; statement: string; status: string }[] = [];
 
     // ---- Sources (reporting) + promotion fast-path links ----
     for (const source of story.sources) {
@@ -225,6 +242,11 @@ async function replaceChildren(
           sourcingNote: claim.sourcingNote ?? null,
         },
       });
+      writtenClaims.push({
+        id: claimRow.id,
+        statement: claim.statement,
+        status: claim.status,
+      });
       const evidenceToConnect = claim.primaryEvidence
         .map((ev) => evidenceIds.get(ev.id))
         .filter((id): id is string => Boolean(id));
@@ -286,6 +308,22 @@ async function replaceChildren(
           storyId,
         },
       });
+    }
+    // ---- Append-only update history (publish note, update, corrections) ----
+    // Drafted by the pure diff rules in history.ts so they can be unit-tested
+    // without a database; written inside this transaction so history can
+    // never drift from the claims it describes. Prior rows are untouched.
+    const drafts = buildUpdateHistory({
+      created: context.created,
+      now: context.now,
+      updateSummary: options.updateSummary,
+      story,
+      previousClaims: context.previousClaims,
+      previousSources: context.previousSources,
+      writtenClaims,
+    });
+    for (const draft of drafts) {
+      await tx.storyUpdate.create({ data: { ...draft, storyId } });
     }
   });
 }
