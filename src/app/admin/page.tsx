@@ -71,6 +71,7 @@ export default async function AdminPage() {
     prisma.storyUpdate.findMany({
       select: {
         id: true,
+        kind: true,
         whatChanged: true,
         reason: true,
         timestamp: true,
@@ -100,6 +101,53 @@ export default async function AdminPage() {
     headline: story.headline,
     gate: validateStory(story),
   }));
+
+  // Provenance roll-up. Anyone who can publish has to be able to answer, in
+  // one screen, how much of what we published was judged by a model, how much
+  // was extracted by one, how many changes were corrections, and how many
+  // "sources" actually share an origin.
+  const [methodCounts, provenanceCounts, sourcingGroups, correctionCount] =
+    await Promise.all([
+      prisma.primaryEvidence.groupBy({
+        by: ["assessmentMethod"],
+        _count: { _all: true },
+      }),
+      prisma.claim.groupBy({
+        by: ["extractionProvenance"],
+        _count: { _all: true },
+      }),
+      prisma.articleSource.groupBy({
+        by: ["sourcingGroup"],
+        _count: { _all: true },
+      }),
+      prisma.storyUpdate.count({ where: { kind: "CORRECTION" } }),
+    ]);
+
+  const judgedTotal = methodCounts.reduce(
+    (sum, row) => sum + row._count._all,
+    0
+  );
+  const aiJudged =
+    methodCounts.find((row) => row.assessmentMethod === "AI_HYBRID")?._count
+      ._all ?? 0;
+  // "independent:<domain>" is the honest default; anything else means two
+  // outlets were found to be printing the same origin.
+  const sharedOriginGroups = sourcingGroups.filter(
+    (row) =>
+      row.sourcingGroup &&
+      !row.sourcingGroup.startsWith("independent:") &&
+      row._count._all > 1
+  ).length;
+  const provenanceRows = provenanceCounts
+    .map((row) => `${row.extractionProvenance ?? "unset"} (${row._count._all})`)
+    .join(" · ");
+  const claimsTotal = provenanceCounts.reduce(
+    (sum, row) => sum + row._count._all,
+    0
+  );
+  const modelExtracted = provenanceCounts
+    .filter((row) => (row.extractionProvenance ?? "").startsWith("remote:"))
+    .reduce((sum, row) => sum + row._count._all, 0);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 font-mono text-sm text-slate-800 dark:text-slate-200">
@@ -317,6 +365,34 @@ export default async function AdminPage() {
 
       <section className="space-y-2">
         <h2 className="text-xs uppercase tracking-widest text-slate-500">
+          Provenance &amp; independence
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat
+            label="Evidence judged by model"
+            value={`${aiJudged} / ${judgedTotal}`}
+          />
+          <Stat
+            label="Claims extracted by model"
+            value={`${modelExtracted} / ${claimsTotal}`}
+          />
+          <Stat label="Corrections logged" value={String(correctionCount)} />
+          <Stat
+            label="Shared-origin groups"
+            value={String(sharedOriginGroups)}
+          />
+        </div>
+        <p className="text-xs text-slate-500">
+          Every judgement records the method that produced it; evidence rows
+          with no method were decided by policy match alone. Extraction
+          provenance: {provenanceRows || "none recorded"}. A shared-origin
+          group is two outlets printing the same reporting, counted once by the
+          independence rule.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-widest text-slate-500">
           Recent story updates
         </h2>
         <ul className="space-y-1 text-xs">
@@ -324,6 +400,15 @@ export default async function AdminPage() {
             <li key={update.id} className="flex gap-2">
               <span className="text-slate-400 shrink-0">
                 {update.timestamp.toISOString().slice(0, 16)}Z
+              </span>
+              <span
+                className={`shrink-0 text-[10px] uppercase tracking-wider ${
+                  update.kind === "CORRECTION"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-slate-400"
+                }`}
+              >
+                {update.kind?.toLowerCase() ?? "update"}
               </span>
               <Link
                 href={`/story/${update.story.slug}`}

@@ -4,11 +4,13 @@ import { ArrowLeft } from "lucide-react";
 import { NarrativeSection } from "@/components/story/detail/NarrativeSection";
 import { ClaimSection } from "@/components/story/detail/ClaimSection";
 import { AnalysisSections } from "@/components/story/detail/AnalysisSections";
+import { CorrectionsSection } from "@/components/story/detail/CorrectionsSection";
 import { StoryCard } from "@/components/story/StoryCard";
 import { SaveButton } from "@/components/story/SaveButton";
 import { TopicFollowButton } from "@/components/story/TopicFollowButton";
 import { RecordRead } from "@/components/system/RecordRead";
 import { getStoryBySlug, getRelatedStories } from "@/lib/stories/dal";
+import { sourcingHeadline, summariseSourcing } from "@/lib/sourcing-summary";
 import {
   getFollowedTopics,
   getReaderId,
@@ -46,6 +48,9 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
   const publisherNames = [
     ...new Set(story.sources.map((source) => source.publisher.name)),
   ];
+  // The byline says how many outlets filed, and how many origins that really
+  // is — "four sources" that share one wire copy is not four sources.
+  const sourcing = summariseSourcing(story.sources);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
@@ -89,7 +94,7 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
         </p>
 
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {publisherNames.join(", ")} · {story.sources.length} sources ·{" "}
+          {publisherNames.join(", ")} · {sourcingHeadline(sourcing)} ·{" "}
           {story.readingTimeMinutes} min read · updated{" "}
           {publishedOn(story.lastUpdated)}
         </p>
@@ -120,6 +125,8 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
         timeline={story.timeline}
         sources={story.sources}
       />
+
+      <CorrectionsSection updates={story.updates ?? []} />
 
       {related.length > 0 && (
         <section className="space-y-4 pt-2">

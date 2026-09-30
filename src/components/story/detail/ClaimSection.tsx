@@ -1,5 +1,5 @@
 import React from "react";
-import { Claim } from "@/types/story";
+import { Claim, EvidenceRelationship } from "@/types/story";
 import { ClaimBadge } from "@/components/ui/ClaimBadge";
 import {
   FileText,
@@ -15,6 +15,56 @@ interface ClaimSectionProps {
 }
 
 const MAX_SNIPPET_CHARS = 250;
+
+/**
+ * How a document was judged, in the reader's language. "policy match" is a
+ * deterministic rule; "assisted by <model>" says a model took a look and the
+ * verdict was reconciled against the rules. The distinction is stored per row,
+ * so it is never guessed at render time.
+ */
+const METHOD_LABEL: Record<string, string> = {
+  DETERMINISTIC: "verdict from policy match",
+  AI_HYBRID: "verdict assisted by a model",
+};
+
+const RELATIONSHIP_LABEL: Record<EvidenceRelationship, string> = {
+  SUPPORTS: "supports",
+  CONTRADICTS: "contradicts",
+  MENTIONS_ONLY: "mentions only",
+  IRRELEVANT: "irrelevant",
+  UNCLEAR: "unclear",
+};
+
+const RELATIONSHIP_TONE: Record<EvidenceRelationship, string> = {
+  SUPPORTS: "text-emerald-700 dark:text-emerald-400",
+  CONTRADICTS: "text-rose-700 dark:text-rose-400",
+  MENTIONS_ONLY: "text-zinc-500",
+  IRRELEVANT: "text-zinc-400",
+  UNCLEAR: "text-amber-700 dark:text-amber-400",
+};
+
+/**
+ * Honest, short label for where a claim sentence came from. Values are written
+ * by the ingest path as "remote:<model>", "local-deterministic[:fallback][@ruleset]",
+ * or "seed"; anything unrecognised is echoed verbatim rather than dressed up.
+ */
+function provenanceLabel(provenance: string): string {
+  if (provenance === "seed") return "editorially curated";
+  if (provenance.startsWith("remote:")) {
+    return `extracted by ${provenance.slice("remote:".length)}`;
+  }
+  if (provenance.startsWith("local-deterministic")) {
+    const [, ruleset] = provenance.split("@");
+    return [
+      "extracted locally",
+      provenance.includes("fallback") ? "after a model call failed" : "",
+      ruleset ? `(rules ${ruleset})` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  return `extracted by ${provenance}`;
+}
 
 function truncateSnippet(text: string): { text: string; truncated: boolean } {
   if (text.length <= MAX_SNIPPET_CHARS) return { text, truncated: false };
@@ -65,6 +115,30 @@ export const ClaimSection: React.FC<ClaimSectionProps> = ({ claims }) => {
               </span>
               {claim.explanation}
             </p>
+            {(typeof claim.independentSourceCount === "number" ||
+              claim.sourcingNote) && (
+              <p className="flex items-start gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                {claim.sourcingNote ? (
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
+                ) : (
+                  <Landmark className="w-3 h-3 mt-0.5 shrink-0 text-zinc-400" />
+                )}
+                <span>
+                  {typeof claim.independentSourceCount === "number" && (
+                    <>
+                      {claim.independentSourceCount} independent{" "}
+                      {claim.independentSourceCount === 1 ? "origin" : "origins"}{" "}
+                      behind this claim
+                      {(claim.corroboratingSources?.length ?? 0) >
+                        (claim.independentSourceCount ?? 0) &&
+                        ` (${claim.corroboratingSources?.length} outlets quoted)`}
+                      {claim.sourcingNote ? " — " : ""}
+                    </>
+                  )}
+                  {claim.sourcingNote}
+                </span>
+              </p>
+            )}
 
             {claim.primaryEvidence && claim.primaryEvidence.length > 0 && (
               <div className="space-y-1.5 pt-1">
@@ -111,6 +185,37 @@ export const ClaimSection: React.FC<ClaimSectionProps> = ({ claims }) => {
                       <blockquote className="text-[11px] italic text-zinc-600 dark:text-zinc-300 border-l-2 border-emerald-500 pl-2 mt-1">
                         “{ev.excerpt}”
                       </blockquote>
+                    )}
+                    {(ev.relationship || ev.assessmentMethod) && (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-mono">
+                        {ev.relationship && (
+                          <span
+                            className={`font-semibold uppercase tracking-wider ${RELATIONSHIP_TONE[ev.relationship]}`}
+                          >
+                            {RELATIONSHIP_LABEL[ev.relationship]}
+                          </span>
+                        )}
+                        {ev.assessmentMethod && (
+                          <span className="text-zinc-400">
+                            {ev.assessmentMethod === "AI_HYBRID"
+                              ? `verdict assisted by ${ev.assessmentModel ?? "a model"}`
+                              : METHOD_LABEL.DETERMINISTIC}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {ev.supportingPassage && (
+                      <blockquote className="border-l-2 border-sky-400 pl-2 text-[11px] italic text-zinc-600 dark:text-zinc-300">
+                        Passage relied on: “{ev.supportingPassage}”
+                      </blockquote>
+                    )}
+                    {ev.relationshipReason && (
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                          Why:{" "}
+                        </span>
+                        {ev.relationshipReason}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -213,6 +318,11 @@ export const ClaimSection: React.FC<ClaimSectionProps> = ({ claims }) => {
                   minute: "2-digit",
                 })}
               </span>
+              {claim.extractionProvenance && (
+                <span className="truncate">
+                  • {provenanceLabel(claim.extractionProvenance)}
+                </span>
+              )}
             </div>
           </article>
         ))}

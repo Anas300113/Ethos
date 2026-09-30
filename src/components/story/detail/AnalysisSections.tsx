@@ -3,6 +3,7 @@ import { SourceComparisonItem, TimelineEvent, ArticleSource } from "@/types/stor
 import { Layers, History, ExternalLink, Clock3 } from "lucide-react";
 import { StanceLabel } from "@/components/ui/StanceLabel";
 import { resolveStance } from "@/lib/stance";
+import { sharedOriginNote, summariseSourcing } from "@/lib/sourcing-summary";
 
 interface AnalysisSectionsProps {
   whereSourcesDiffer: SourceComparisonItem[];
@@ -15,6 +16,11 @@ export const AnalysisSections: React.FC<AnalysisSectionsProps> = ({
   timeline,
   sources,
 }) => {
+  // Independence is a sourcing-group fact, not an outlet count: four papers
+  // printing one dispatch is ONE origin, and the reader has to be told.
+  const sourcing = summariseSourcing(sources ?? []);
+  const sourcingNote = sharedOriginNote(sourcing);
+
   return (
     <div className="space-y-6">
       {/* Reporting Stance Comparison */}
@@ -128,9 +134,23 @@ export const AnalysisSections: React.FC<AnalysisSectionsProps> = ({
       {/* Sources & Fair-Use Citations */}
       {sources && sources.length > 0 && (
         <section className="space-y-3 pt-2">
-          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-            Source Index & Attribution ({sources.length} outlets)
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              Source Index & Attribution
+            </h2>
+            <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+              {!sourcing.grouped
+                ? `${sourcing.outlets} ${sourcing.outlets === 1 ? "outlet" : "outlets"}`
+                : sourcing.origins === sourcing.outlets
+                  ? `${sourcing.outlets} independent ${sourcing.outlets === 1 ? "origin" : "origins"}`
+                  : `${sourcing.outlets} outlets · ${sourcing.origins} ${sourcing.origins === 1 ? "origin" : "origins"}`}
+            </span>
+          </div>
+          {sourcingNote && (
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+              {sourcingNote}
+            </p>
+          )}
           <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800 text-xs">
             {sources.map((src) => (
               <div
@@ -155,6 +175,14 @@ export const AnalysisSections: React.FC<AnalysisSectionsProps> = ({
                       <>
                         <span>•</span>
                         <span>By {src.author}</span>
+                      </>
+                    )}
+                    {src.sharedSourceLabel && src.sharedSourceLabel !== "independent" && (
+                      <>
+                        <span>•</span>
+                        <span className="text-amber-700 dark:text-amber-400">
+                          via {src.sharedSourceLabel}
+                        </span>
                       </>
                     )}
                   </div>
