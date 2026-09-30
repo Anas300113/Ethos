@@ -140,6 +140,65 @@ describe("clustering", () => {
     assert.equal(clusterArticles([appleCourt, applePatent]).length, 1);
   });
 
+  it("uses embeddings only as extra recall inside the hard-signal gate", () => {
+    // Same event, near-disjoint wording, one shared figure: the lexical score
+    // sits BELOW the deterministic threshold, which is exactly the rewrite
+    // case embeddings exist to catch.
+    const yorkshire = article({
+      id: "d1",
+      title:
+        "Flood defences get £2bn boost in Yorkshire as Treasury confirms winter storm recovery funding for river barriers",
+      excerpt:
+        "The Treasury confirmed the funding package for river barriers, coastal towns and drainage upgrades across the region.",
+      publisherName: "BBC",
+    });
+    const barriers = article({
+      id: "d2",
+      title: "Cash injection approved for barriers and sea walls",
+      excerpt: "A £2bn settlement was signed off this morning, officials said.",
+      publisherName: "Guardian",
+    });
+    assert.ok(articleSimilarity(yorkshire, barriers) < MERGE_THRESHOLD);
+    assert.ok(hasSameEventSignal(yorkshire, barriers));
+    // Deterministic path (the default, and the fallback): two clusters.
+    assert.equal(clusterArticles([yorkshire, barriers]).length, 2);
+    // Semantic scorer above the semantic threshold: one cluster.
+    assert.equal(
+      clusterArticles([yorkshire, barriers], { semanticSimilarity: () => 0.9 }).length,
+      1
+    );
+    // A weak semantic score changes nothing.
+    assert.equal(
+      clusterArticles([yorkshire, barriers], { semanticSimilarity: () => 0.3 }).length,
+      2
+    );
+    // Missing vectors (null) degrade to the lexical verdict.
+    assert.equal(
+      clusterArticles([yorkshire, barriers], { semanticSimilarity: () => null }).length,
+      2
+    );
+
+    // Embeddings never bypass the hard signal: same beat, no shared figure,
+    // one shared entity, semantic similarity ~1 — still two stories.
+    const rates = article({
+      id: "e1",
+      title: "Bank of England holds interest rates at 4%",
+      excerpt: "The Bank of England kept rates unchanged at 4% after its latest meeting.",
+      publisherName: "BBC",
+    });
+    const climate = article({
+      id: "e2",
+      title: "Bank of England publishes climate stress-test results",
+      excerpt: "The Bank of England published results of its climate stress test for lenders.",
+      publisherName: "Guardian",
+    });
+    assert.ok(!hasSameEventSignal(rates, climate));
+    assert.equal(
+      clusterArticles([rates, climate], { semanticSimilarity: () => 0.99 }).length,
+      2
+    );
+  });
+
   it("a single outlet alone is not promotable", () => {
     const clusters = clusterArticles([
       article({ id: "a", title: "Exclusive: minister resigns, says aide" }),

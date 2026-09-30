@@ -23,6 +23,7 @@ import {
   type ClusterableArticle,
 } from "./cluster";
 import { assessClaim, type Assessment } from "./assess";
+import { buildSemanticScorer } from "./semantic";
 import {
   groupSources,
   sourcingNote,
@@ -599,7 +600,12 @@ export async function runCuration(options: CurateOptions): Promise<CurateReport>
       topic,
     })
   );
-  const clusters = clusterArticles(clusterable);
+  // Optional semantic path: one batched embedding call per run when a
+  // provider is configured, then pure arithmetic for pairwise comparison.
+  // Without it (default) clustering is exactly the deterministic lexical one.
+  const semantic = await buildSemanticScorer(providers.embeddings, clusterable);
+  if (semantic) log("clustering: embeddings active (semantic similarity joins lexical)");
+  const clusters = clusterArticles(clusterable, semantic);
 
   const report: CurateReport = {
     dryRun: options.dryRun ?? false,

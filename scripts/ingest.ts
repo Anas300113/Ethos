@@ -158,10 +158,18 @@ function printSummary(report: IngestRunReport): void {
   }
 
   const totals = report.totals;
+  const statusLine = [
+    `${totals.ok} ok`,
+    totals.notModified > 0 ? `${totals.notModified} unchanged` : null,
+    totals.rejected > 0 ? `${totals.rejected} not-a-feed` : null,
+    `${totals.failed} failed`,
+  ]
+    .filter(Boolean)
+    .join(", ");
   console.log(
-    `\n${report.feeds.length} feeds (${totals.ok} ok, ${totals.failed} failed) — ` +
+    `\n${report.feeds.length} feeds (${statusLine}) — ` +
       `${totals.discovered} entries: ${totals.stored} new, ${totals.duplicates} known, ` +
-      `${totals.updated} updated, ${totals.rejected} refused`
+      `${totals.updated} updated, ${totals.refused} refused`
   );
   if (codes.size > 0) {
     const breakdown = [...codes.entries()]

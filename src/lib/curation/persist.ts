@@ -35,13 +35,19 @@ type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
 async function ensurePublisher(
   tx: Tx,
-  publisher: { name: string; domain: string; tier: string }
+  publisher: { name: string; domain: string; tier: string },
+  cache: Map<string, string>
 ): Promise<string> {
+  const cached = cache.get(publisher.domain);
+  if (cached) return cached;
   const existing = await tx.publisher.findUnique({
     where: { domain: publisher.domain },
     select: { id: true },
   });
-  if (existing) return existing.id;
+  if (existing) {
+    cache.set(publisher.domain, existing.id);
+    return existing.id;
+  }
   const created = await tx.publisher.create({
     data: {
       name: publisher.name,
@@ -51,6 +57,7 @@ async function ensurePublisher(
       tier: "SECONDARY_TIER2",
     },
   });
+  cache.set(publisher.domain, created.id);
   return created.id;
 }
 
@@ -168,9 +175,28 @@ async function replaceChildren(
     // Rows written this pass, for the status diff against previousClaims.
     const writtenClaims: { id: string; statement: string; status: string }[] = [];
 
+    // Batch the lookups the source loop needs: one query for publishers and
+    // one for promotion links, instead of two per source (N+1).
+    const domains = [...new Set(story.sources.map((source) => source.publisher.domain))];
+    const knownPublishers = domains.length
+      ? await tx.publisher.findMany({
+        where: { domain: { in: domains } },
+        select: { id: true, domain: true },
+      })
+      : [];
+    const publisherCache = new Map(knownPublishers.map((row) => [row.domain, row.id]));
+    const sourceUrls = story.sources.map((source) => source.url);
+    const ingestedRows = sourceUrls.length
+      ? await tx.ingestedItem.findMany({
+        where: { url: { in: sourceUrls } },
+        select: { id: true, url: true },
+      })
+      : [];
+    const ingestedByUrl = new Map(ingestedRows.map((row) => [row.url, row.id]));
+
     // ---- Sources (reporting) + promotion fast-path links ----
     for (const source of story.sources) {
-      const publisherId = await ensurePublisher(tx, source.publisher);
+      const publisherId = await ensurePublisher(tx, source.publisher, publisherCache);
       const article = await tx.articleSource.create({
         data: {
           url: source.url,
@@ -186,13 +212,10 @@ async function replaceChildren(
           sharedSourceLabel: source.sharedSourceLabel ?? null,
         },
       });
-      const ingested = await tx.ingestedItem.findUnique({
-        where: { url: source.url },
-        select: { id: true },
-      });
-      if (ingested) {
+      const ingestedId = ingestedByUrl.get(source.url);
+      if (ingestedId) {
         await tx.sourcePromotion.create({
-          data: { ingestedItemId: ingested.id, articleId: article.id },
+          data: { ingestedItemId: ingestedId, articleId: article.id },
         });
       }
     }

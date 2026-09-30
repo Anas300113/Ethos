@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { constructProviders } from "@/lib/providers";
 import { validateStory } from "@/lib/verification";
-import { getStoryBySlug } from "@/lib/stories/dal";
+import { getStoriesBySlugs } from "@/lib/stories/dal";
 
 // Operator console: always reflects the current pipeline state.
 export const dynamic = "force-dynamic";
@@ -90,22 +90,16 @@ export default async function AdminPage() {
 
   // Re-run the deterministic gate over what is live: a story that fails now
   // (e.g. after a rules change) is the first thing an operator should see.
-  const gateReports = (
-    await Promise.all(
-      storyRows
-        .filter((row) => row.status !== "REJECTED")
-        .slice(0, 6)
-        .map(async (row) => {
-          const story = await getStoryBySlug(row.slug);
-          if (!story) return null;
-          return {
-            slug: row.slug,
-            headline: row.headline,
-            gate: validateStory(story),
-          };
-        })
-    )
-  ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  // One batched dossier query for the whole strip, not one per row.
+  const gateSlugs = storyRows
+    .filter((row) => row.status !== "REJECTED")
+    .slice(0, 6)
+    .map((row) => row.slug);
+  const gateReports = (await getStoriesBySlugs(gateSlugs)).map((story) => ({
+    slug: story.slug,
+    headline: story.headline,
+    gate: validateStory(story),
+  }));
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 font-mono text-sm text-slate-800 dark:text-slate-200">

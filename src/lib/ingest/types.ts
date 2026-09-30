@@ -135,13 +135,22 @@ export interface IngestRunReport {
   finishedAt: Date;
   dryRun: boolean;
   feeds: FeedRunOutcome[];
+  /**
+   * Per-status feed counts. Kept separate because they mean different things
+   * to an operator: OK = polled and parsed; NOT_MODIFIED = polled, unchanged;
+   * REJECTED = responded, but the body was not a feed; FAILED = never got a
+   * usable response. Counting REJECTED as "ok" hid broken feed URLs.
+   */
   totals: {
     ok: number;
+    notModified: number;
+    rejected: number;
     failed: number;
     discovered: number;
     stored: number;
     duplicates: number;
     updated: number;
-    rejected: number;
+    /** Items refused by normalisation, across all feeds. */
+    refused: number;
   };
 }

@@ -188,6 +188,25 @@ export async function getStoryBySlug(slug: string): Promise<Story | null> {
   return toStory(row);
 }
 
+/**
+ * Many dossiers in ONE round trip. `/saved` used to call getStoryBySlug once
+ * per bookmark — a reader with 40 saves meant 40 dossier queries. Order of the
+ * result follows the order of `slugs`, so the caller keeps its own sort
+ * (bookmarks are newest-saved-first); unpublished/hidden slugs drop out.
+ */
+export async function getStoriesBySlugs(slugs: string[]): Promise<Story[]> {
+  if (slugs.length === 0) return [];
+  const rows = await prisma.story.findMany({
+    where: { slug: { in: slugs }, ...visible },
+    include: storyInclude,
+  });
+  const bySlug = new Map(rows.map((row) => [row.slug, row]));
+  return slugs
+    .map((slug) => bySlug.get(slug))
+    .filter((row): row is (typeof rows)[number] => row !== undefined)
+    .map((row) => toStory(row));
+}
+
 /** Topic siblings for the "related stories" strip (same topic, newest first). */
 export async function getRelatedStories(
   story: Story,

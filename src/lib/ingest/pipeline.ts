@@ -122,22 +122,30 @@ export async function runIngestion(options: IngestOptions = {}): Promise<IngestR
 
   const totals = outcomes.reduce(
     (accumulator, outcome) => ({
-      ok: accumulator.ok + (outcome.status === "FAILED" ? 0 : 1),
+      // Status counts stay distinct (see IngestRunReport.totals): a feed that
+      // returned a non-feed body is REJECTED, never "ok".
+      ok: accumulator.ok + (outcome.status === "OK" ? 1 : 0),
+      notModified: accumulator.notModified + (outcome.status === "NOT_MODIFIED" ? 1 : 0),
+      rejected: accumulator.rejected + (outcome.status === "REJECTED" ? 1 : 0),
       failed: accumulator.failed + (outcome.status === "FAILED" ? 1 : 0),
       discovered: accumulator.discovered + outcome.discovered,
       stored: accumulator.stored + outcome.stored,
       duplicates: accumulator.duplicates + outcome.duplicates,
       updated: accumulator.updated + outcome.updated,
-      rejected: accumulator.rejected + outcome.rejected,
+      // Item-level refusals (stale, off-topic, duplicate-in-feed…), which is a
+      // different number from feeds REJECTED for not being feeds.
+      refused: accumulator.refused + outcome.rejected,
     }),
     {
       ok: 0,
+      notModified: 0,
+      rejected: 0,
       failed: 0,
       discovered: 0,
       stored: 0,
       duplicates: 0,
       updated: 0,
-      rejected: 0,
+      refused: 0,
     }
   );
 

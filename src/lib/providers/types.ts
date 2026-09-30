@@ -22,6 +22,8 @@ export interface ProviderReport {
   ai: { kind: ProviderKind; name: string };
   evidenceSearch: { kind: ProviderKind; name: string };
   documentFetch: { kind: ProviderKind; name: string };
+  /** "local"/"none" when no embedding provider is configured. */
+  embeddings: { kind: ProviderKind; name: string };
 }
 
 export interface ClaimInput {
@@ -147,4 +149,14 @@ export interface EvidenceSearchProvider {
 export interface DocumentFetcher {
   readonly name: string;
   fetchDocument(url: string): Promise<{ text: string; contentType: string } | null>;
+}
+
+/**
+ * Embed text for semantic similarity (optional capability). Returns null when
+ * unconfigured or when the call fails — the caller then falls back to
+ * deterministic lexical clustering.
+ */
+export interface EmbeddingProvider {
+  readonly name: string;
+  embed(texts: string[]): Promise<number[][] | null>;
 }

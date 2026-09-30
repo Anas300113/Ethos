@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { runIngestion } from "./pipeline";
+import type { FeedConfig } from "./types";
 
 const INGEST_DIR = path.join(process.cwd(), "src", "lib", "ingest");
 const CURATED_MODELS = ["Story", "Claim", "PrimaryEvidence"] as const;
@@ -144,5 +146,94 @@ describe("ingest architecture", () => {
         cli.includes("await syncFeedRegistry("),
       "scripts/ingest.ts must skip registry sync on dry runs"
     );
+  });
+});
+
+const FEEDS: FeedConfig[] = [
+  {
+    label: "Broken feed",
+    feedUrl: "https://broken.example/rss",
+    publisherName: "Broken",
+    publisherDomain: "broken.example",
+    topic: "World",
+  },
+  {
+    label: "Working feed",
+    feedUrl: "https://works.example/rss",
+    publisherName: "Works",
+    publisherDomain: "works.example",
+    topic: "UK",
+  },
+];
+
+const RSS_BODY = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Works</title>
+  <item>
+    <title>Ministers unveil £2bn flood defence programme</title>
+    <link>https://works.example/flood-defences</link>
+    <description>The Treasury confirmed £2bn for river barriers across Yorkshire.</description>
+    <pubDate>Tue, 29 Sep 2026 09:00:00 GMT</pubDate>
+  </item>
+</channel></rss>`;
+
+describe("ingest run isolation", () => {
+  it("one broken feed never blocks the rest of the run", async () => {
+    const report = await runIngestion({
+      feeds: FEEDS,
+      dryRun: true,
+      now: () => new Date("2026-09-30T12:00:00Z"),
+      fetcher: async ({ url }) =>
+        url.includes("broken")
+          ? { kind: "error", httpStatus: 500, reason: "ECONNRESET: connection reset" }
+          : {
+            kind: "ok",
+            httpStatus: 200,
+            body: RSS_BODY,
+            bytes: RSS_BODY.length,
+            contentType: "application/rss+xml",
+          },
+    });
+
+    assert.equal(report.feeds.length, 2);
+    const [broken, working] = report.feeds;
+    assert.equal(broken.status, "FAILED");
+    assert.ok(broken.error, "a failed feed must carry a reason for the operator");
+    // The healthy feed still ran, and its items were still discovered.
+    assert.notEqual(working.status, "FAILED");
+    assert.ok(working.discovered >= 1, `working feed discovered ${working.discovered}`);
+    assert.equal(report.totals.failed, 1);
+    assert.equal(report.totals.ok, 1);
+    assert.ok(report.totals.discovered >= 1);
+  });
+
+  it("a feed that fails mid-parse is contained to its own outcome", async () => {
+    const report = await runIngestion({
+      feeds: FEEDS,
+      dryRun: true,
+      now: () => new Date("2026-09-30T12:00:00Z"),
+      fetcher: async ({ url }) =>
+        url.includes("broken")
+          ? {
+            kind: "ok",
+            httpStatus: 200,
+            body: "<html><body>not a feed at all</body></html>",
+            bytes: 38,
+            contentType: "application/rss+xml",
+          }
+          : {
+            kind: "ok",
+            httpStatus: 200,
+            body: RSS_BODY,
+            bytes: RSS_BODY.length,
+            contentType: "application/rss+xml",
+          },
+    });
+    assert.equal(report.feeds.length, 2);
+    assert.equal(report.totals.ok, 1);
+    // A non-feed body is REJECTED, not "ok" — the summary must not hide it.
+    assert.equal(report.totals.rejected, 1);
+    assert.equal(report.totals.failed, 0);
+    assert.ok(report.totals.discovered >= 1);
   });
 });

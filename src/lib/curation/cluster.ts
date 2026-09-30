@@ -155,6 +155,26 @@ export function articleSimilarity(
   return weighted === 0 ? 0 : shared / Math.max(weighted, tokensB.size);
 }
 
+/**
+ * Does this pair belong to the same event?
+ *
+ * The hard signal (shared figure, or >=2 shared entities) is mandatory in
+ * both paths — that is what stops "two stories about the same person
+ * organisation" from merging. Within that gate, the deterministic lexical
+ * score is the safety floor, and configured embeddings may additionally
+ * rescue a genuine rewrite the lexical score cannot see.
+ */
+function pairMerges(
+  candidate: ClusterableArticle,
+  member: ClusterableArticle,
+  options?: ClusterOptions
+): boolean {
+  if (!hasSameEventSignal(candidate, member)) return false;
+  if (articleSimilarity(candidate, member) >= MERGE_THRESHOLD) return true;
+  const semantic = options?.semanticSimilarity?.(candidate, member) ?? null;
+  return semantic !== null && semantic >= SEMANTIC_MERGE_THRESHOLD;
+}
+
 function clusterKey(members: ClusterableArticle[]): string {
   const counts = new Map<string, number>();
   for (const article of members) {
@@ -180,6 +200,24 @@ function clusterKey(members: ClusterableArticle[]): string {
  * 0.44 — it is excluded by the hard signal, not by this number.
  */
 export const MERGE_THRESHOLD = 0.2;
+
+/**
+ * Optional semantic (embedding) merge threshold. Embeddings are an ADDITIONAL
+ * recall path for rewrites the lexical score cannot see ("chip shortage hits
+ * car plants" vs "semiconductor supply crunch halts production"), never a
+ * replacement for the deterministic rules: a pair still has to carry a hard
+ * signal (shared figure, or >=2 shared entities) to merge, so two articles
+ * about the same organisation or person never merge on resemblance alone.
+ */
+export const SEMANTIC_MERGE_THRESHOLD = 0.82;
+
+export interface ClusterOptions {
+  /**
+   * Cosine similarity from sentence embeddings, when a provider is
+   * configured. Returns null when either article has no vector.
+   */
+  semanticSimilarity?: (a: ClusterableArticle, b: ClusterableArticle) => number | null;
+}
 
 /**
  * Hard signals: a shared FIGURE (numbers are event-specific) or at least two
@@ -222,7 +260,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * guards are the topic gate, the 7-day window, and two-publisher promotion.
  */
 export function clusterArticles(
-  articles: ClusterableArticle[]
+  articles: ClusterableArticle[],
+  options?: ClusterOptions
 ): ArticleCluster[] {
   const ordered = [...articles].sort(
     (x, y) =>
@@ -247,11 +286,7 @@ export function clusterArticles(
       );
       if (!spanOk) continue;
       if (
-        cluster.members.some(
-          (member) =>
-            articleSimilarity(article, member) >= MERGE_THRESHOLD &&
-            hasSameEventSignal(article, member)
-        )
+        cluster.members.some((member) => pairMerges(article, member, options))
       ) {
         cluster.members.push(article);
         placed = true;

@@ -5,6 +5,7 @@ import { AllowlistEvidenceSearch } from "./evidence";
 import { constructProviders } from "./index";
 import { LocalAIProvider } from "./local-ai";
 import { RemoteAIProvider } from "./remote-ai";
+import { RemoteEmbeddingsProvider } from "./embeddings";
 import {
   sanitiseClaims,
   sanitiseRelationship,
@@ -152,5 +153,82 @@ describe("providers", () => {
     assert.ok(out.whatHappened.includes("£4bn housing programme"));
     assert.ok(out.whatIsUnclear.some((s) => s.includes("100,000 homes")));
     assert.ok(!out.whatWeKnow.some((s) => s.includes("100,000")));
+  });
+});
+
+describe("embeddings provider", () => {
+  // No sockets in tests: every case runs behind a fetch stub that is restored
+  // afterwards, so a provider that tried to reach the internet is a failure.
+  async function withFetchStub<T>(
+    stub: (input: unknown, init?: unknown) => Promise<Response>,
+    run: () => Promise<T>
+  ): Promise<T> {
+    const original = globalThis.fetch;
+    globalThis.fetch = stub;
+    try {
+      return await run();
+    } finally {
+      globalThis.fetch = original;
+    }
+  }
+
+  const jsonResponse = (body: unknown, ok = true, status = ok ? 200 : 500): Response =>
+    ({ ok, status, json: async () => body }) as Response;
+
+  it("is absent from the bundle without credentials", () => {
+    const bare = constructProviders({});
+    assert.equal(bare.embeddings, undefined);
+    assert.equal(bare.report.embeddings.kind, "local");
+    assert.equal(bare.report.embeddings.name, "none");
+
+    const configured = constructProviders({ EMBEDDINGS_API_KEY: "k" });
+    assert.ok(configured.embeddings, "a key must surface an embeddings provider");
+    assert.equal(configured.report.embeddings.kind, "remote");
+    // Optional recall must not flip the honest dev-mode verdict: that flag is
+    // about synthesis and evidence search, which are still local here.
+    assert.equal(configured.isDevelopmentMode, true);
+  });
+
+  it("returns null without a key and never opens a socket", async () => {
+    let attempts = 0;
+    const result = await withFetchStub(
+      async () => {
+        attempts += 1;
+        throw new Error("no network in tests");
+      },
+      () => new RemoteEmbeddingsProvider({ apiKey: "" }).embed(["anything at all"])
+    );
+    assert.equal(result, null);
+    assert.equal(attempts, 0, "an unconfigured provider must not attempt a request");
+  });
+
+  it("orders vectors by the provider index and fails closed on a short response", async () => {
+    const shuffled = {
+      data: [
+        { index: 1, embedding: [0, 1] },
+        { index: 0, embedding: [1, 0] },
+      ],
+    };
+    const ordered = await withFetchStub(
+      async () => jsonResponse(shuffled),
+      () => new RemoteEmbeddingsProvider({ apiKey: "k" }).embed(["a", "b"])
+    );
+    assert.deepEqual(
+      ordered,
+      [[1, 0], [0, 1]],
+      "vectors must follow the input order, not the response order"
+    );
+
+    const truncated = await withFetchStub(
+      async () => jsonResponse({ data: [{ index: 0, embedding: [1, 0] }] }),
+      () => new RemoteEmbeddingsProvider({ apiKey: "k" }).embed(["a", "b"])
+    );
+    assert.equal(truncated, null, "a partial batch is not a usable embedding set");
+
+    const rateLimited = await withFetchStub(
+      async () => jsonResponse({ error: "rate limited" }, false, 429),
+      () => new RemoteEmbeddingsProvider({ apiKey: "k" }).embed(["a"])
+    );
+    assert.equal(rateLimited, null, "a refused request degrades to lexical clustering");
   });
 });

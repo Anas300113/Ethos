@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Bookmark, FolderOpen } from "lucide-react";
 import { StoryCard } from "@/components/story/StoryCard";
-import { getStoryBySlug } from "@/lib/stories/dal";
+import { getStoriesBySlugs } from "@/lib/stories/dal";
 import { getReaderId, getSavedStoryRefs } from "@/lib/reader";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function SavedPage() {
   const readerId = await getReaderId();
   const refs = readerId ? await getSavedStoryRefs(readerId) : [];
-  // Unpublishing a story makes its bookmark unreadable, not an error.
-  const stories = (await Promise.all(refs.map((ref) => getStoryBySlug(ref.slug)))).filter(
-    (story): story is NonNullable<typeof story> => story !== null
-  );
+  // Unpublishing a story makes its bookmark unreadable, not an error. One
+  // batched query for every bookmark, in the order the reader saved them.
+  const stories = await getStoriesBySlugs(refs.map((ref) => ref.slug));
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
