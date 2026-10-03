@@ -45,3 +45,10 @@ next-env.d.ts
 
 # local debugging scratch (gate probes, calibration sims)
 tmp-*
+
+# expo / react-native app (own toolchain: npm + expo, installed under apps/mobile)
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+.scratch/
