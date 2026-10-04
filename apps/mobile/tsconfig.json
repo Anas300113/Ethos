@@ -3,6 +3,12 @@
   "compilerOptions": {
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    // Node's --experimental-strip-types resolves ESM imports literally, so test
+    // files import "./module.ts". tsc accepts this only with this flag (noEmit).
+    "allowImportingTsExtensions": true,
+    // TS 6.0 does not auto-include @types here; name them explicitly so
+    // node:test/node:assert resolve in test files.
+    "types": ["node", "react"],
     "paths": {
       "@/*": ["./src/*"]
     }

@@ -40,9 +40,9 @@ export function sourcingBadge(sourcing: Sourcing | undefined): SourcingBadge {
   return {
     label:
       sourcing.headline ||
-      `${sourcing.outlets} outlets · ${sourcing.origins} independent ${
-        sourcing.origins === 1 ? "origin" : "origins"
-      }`,
+      `${sourcing.outlets} ${sourcing.outlets === 1 ? "outlet" : "outlets"} · ${
+        sourcing.origins
+      } independent ${sourcing.origins === 1 ? "origin" : "origins"}`,
     independenceMeasured: true,
     caveat: null,
   };
